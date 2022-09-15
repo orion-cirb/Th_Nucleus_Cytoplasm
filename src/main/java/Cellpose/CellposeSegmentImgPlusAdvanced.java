@@ -101,7 +101,7 @@ public class CellposeSegmentImgPlusAdvanced {
                 // (issue with time-lapse, first frame have less than 254 objects and latest have more)
                 if (cellpose_t_imp.getBitDepth() != 16) {
                     if (cellpose_t_imp.getNSlices() > 1) {
-                        cellpose_t_imp.getStack().setBitDepth(16);
+                        new ImageConverter(cellpose_t_imp).convertToGray16();
                     } else {
                         cellpose_t_imp.setProcessor(cellpose_t_imp.getProcessor().convertToShort(false));
                     }

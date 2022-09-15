@@ -1,4 +1,3 @@
-import Tools.Tools;
 import com.sun.jna.StringArray;
 import ij.IJ;
 import ij.ImagePlus;
@@ -40,11 +39,11 @@ import org.bridj.ann.Array;
  */
 public class Th_Nucleus_Cytoplasm implements PlugIn {
     
-    Tools tools = new Tools();
+    Utils tools = new Utils();
     private boolean canceled = false;
     private String imageDir = "";
     public  String outDirResults = "";
-    public String fileExt = "nd";
+    public String fileExt;
     public ArrayList<String> channelsName = new ArrayList<String>(Arrays.asList("DAPI nuclei", "Th cells", "561"));
     public BufferedWriter globalResults;
     public BufferedWriter cellsResults;
@@ -55,12 +54,18 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
                 IJ.showMessage("Plugin canceled");
                 return;
             }
+            
+            if (! tools.checkInstalledModules()) {
+                return;
+            }      
+                    
             imageDir = IJ.getDirectory("Choose directory containing image files...");
             if (imageDir == null) {
                 return;
             }
             
             // Find images with specific extension
+            fileExt = tools.findImageType(new File(imageDir));           
             ArrayList<String> imageFiles = tools.findImages(imageDir, fileExt);            
             if (imageFiles == null) {
                 IJ.showMessage("Error", "No images found with " + fileExt + " extension");
@@ -120,19 +125,29 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
                 options.setCrop(true);
                 options.setColorMode(ImporterOptions.COLOR_MODE_GRAYSCALE);
                        
-                // Find nucleus
+                //  Open nuclei channel
                 System.out.println("Opening " + channelsName.get(0) + " channel " + channelsOrdered.get(0) + "...");
-                int channel = channels.indexOf(channelsOrdered.get(0));
-                ImagePlus imgNuclei = BF.openImagePlus(options)[channel];
+                int channelNuclei = channels.indexOf(channelsOrdered.get(0));
+                ImagePlus imgNuclei = BF.openImagePlus(options)[channelNuclei];
                 
-                //Compute section volume in µm^3
+                /*//Compute section volume in µm^3
                 double pixVol = tools.cal.pixelWidth * tools.cal.pixelHeight * tools.cal.pixelDepth;
-                double sectionVol = imgNuclei.getWidth() * imgNuclei.getHeight() * imgNuclei.getNSlices() * pixVol;
+                double sectionVol = imgNuclei.getWidth() * imgNuclei.getHeight() * imgNuclei.getNSlices() * pixVol;*/
                 
-                // Find nucleus
+                // Find nuclei
                 Objects3DIntPopulation nucleiPop = new Objects3DIntPopulation();
-                nucleiPop = tools.cellposeNucleiPop(imgNuclei, "cyto", 1, 80, "/opt/miniconda3/envs/cellpose");
-                //System.out.println(nucleiPop.getNbObjects() + " nuclei founds");
+                nucleiPop = tools.cellposeDetection(imgNuclei, "cyto", 1, 80, tools.minNucleusVol, tools.maxNucleusVol);
+                System.out.println(nucleiPop.getNbObjects() + " nuclei founds");
+                
+                // Open Th cells channel
+                System.out.println("Opening " + channelsName.get(1) + " channel " + channelsOrdered.get(1) + "...");
+                int channelTh = channels.indexOf(channelsOrdered.get(1));
+                ImagePlus imgTh = BF.openImagePlus(options)[channelTh];
+                
+                // Find TH cells
+                Objects3DIntPopulation thPop = new Objects3DIntPopulation();
+                thPop = tools.cellposeDetection(imgTh, "cyto", 1, 100, tools.minCellVol, tools.maxCellVol);
+                System.out.println(thPop.getNbObjects() + " Th cells founds");
                 
                 /*// Find inner/outer ring nucleus
                 // outer
