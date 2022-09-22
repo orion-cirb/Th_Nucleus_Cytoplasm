@@ -1,59 +1,37 @@
+import Cellpose.*;
 import fiji.util.gui.GenericDialogPlus;
 import ij.IJ;
 import ij.ImagePlus;
-import ij.ImageStack;
-import ij.gui.Roi;
 import ij.gui.WaitForUserDialog;
 import ij.io.FileSaver;
 import ij.measure.Calibration;
-import ij.measure.ResultsTable;
-import ij.plugin.Duplicator;
 import ij.plugin.RGBStackMerge;
-import ij.plugin.HyperStackConverter;
 import ij.process.ImageProcessor;
-import io.scif.DependencyException;
+import org.apache.commons.io.FilenameUtils;
 import java.awt.Color;
 import java.awt.Font;
-import java.awt.Rectangle;
 import java.io.File;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.ImageIcon;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
 import loci.common.services.ServiceException;
+import loci.common.services.DependencyException;
 import loci.formats.FormatException;
 import loci.formats.meta.IMetadata;
 import loci.plugins.util.ImageProcessorReader;
 import mcib3d.geom2.BoundingBox;
 import mcib3d.geom2.Object3DInt;
+import mcib3d.geom2.Object3DComputation;
 import mcib3d.geom2.Objects3DIntPopulation;
-import mcib3d.geom2.VoxelInt;
-import mcib3d.geom2.measurements.MeasureCentroid;
-import mcib3d.geom2.measurements.MeasureIntensity;
-import mcib3d.geom2.measurements.MeasureVolume;
+import mcib3d.geom2.Objects3DIntPopulationComputation;
 import mcib3d.geom2.measurementsPopulation.MeasurePopulationColocalisation;
 import mcib3d.image3d.ImageHandler;
-import net.haesleinhuepf.clij.clearcl.ClearCLBuffer;
-import net.haesleinhuepf.clij2.CLIJ2;
-import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.io.IOUtils;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-import org.xml.sax.SAXException;
-import Cellpose.*;
 
-/**
+
+
+/*
  * @author hm
  */
 public class Utils {
@@ -64,29 +42,29 @@ public class Utils {
     public ArrayList<String> channelsName;
     public String cellposeEnvDir;
     public Calibration cal;
+    public double pixelVol;
     
-    public double minNucleusVol = 300;
-    public double maxNucleusVol = 1500;
-    public double minCellVol = 300;
-    public double maxCellVol = 1500;
-    
-    /*private Object syncObject = new Object();
-    private CLIJ2 clij2 = CLIJ2.getInstance();*/
+    public double minNucleusVol = 200;
+    public double maxNucleusVol = 4000;
+    public double minCellVol = 400;
+    public double maxCellVol = 12000;
     
     
-     /**
-     * Check installed modules
-     * @return 
-     */
+    
+    /*
+      * Display a message in the ImageJ console and status bar
+      */
+    public void print(String log) {
+        System.out.println(log);
+        IJ.showStatus(log);
+    }
+    
+    
+     /*
+      * Check that needed modules are installed
+      */
     public boolean checkInstalledModules() {
-        // check install
         ClassLoader loader = IJ.getClassLoader();
-        /*try {
-            loader.loadClass("net.haesleinhuepf.clij2.CLIJ2");
-        } catch (ClassNotFoundException e) {
-            IJ.log("CLIJ not installed, please install from update site");
-            return false;
-        }*/
         try {
             loader.loadClass("mcib3d.geom.Object3D");
         } catch (ClassNotFoundException e) {
@@ -97,9 +75,9 @@ public class Utils {
     }
     
     
-     /**
-     * Find image type
-     */
+     /*
+      * Find type of images in folder
+      */
     public String findImageType(File imagesFolder) {
         String ext = "";
         String[] files = imagesFolder.list();
@@ -126,9 +104,6 @@ public class Utils {
     
     /*
      * Find images in folder
-     * @param imagesFolder
-     * @param imageExt
-     * @return 
      */
     public ArrayList<String> findImages(String imagesFolder, String imageExtension) {
         File inDir = new File(imagesFolder);
@@ -148,10 +123,8 @@ public class Utils {
     }
     
     
-     /**
+    /*
      * Find image calibration
-     * @param meta
-     * @return 
      */
     public Calibration findImageCalib(IMetadata meta) {
         cal = new Calibration();  
@@ -167,15 +140,13 @@ public class Utils {
     }
     
     
-     /**
-     * Find channels name
-     * @param imageName
-     * @return 
-     * @throws loci.common.services.DependencyException
-     * @throws loci.common.services.ServiceException
-     * @throws loci.formats.FormatException
-     * @throws java.io.IOException
-     */
+     /*
+      * Find channels name
+      * @throws loci.common.services.DependencyException
+      * @throws loci.common.services.ServiceException
+      * @throws loci.formats.FormatException
+      * @throws java.io.IOException
+      */
     public ArrayList<String> findChannels(String imageName, IMetadata meta, ImageProcessorReader reader, ArrayList<String> channelsName) throws DependencyException, ServiceException, FormatException, IOException {
         this.channelsName = channelsName;
         int nbChannels = reader.getSizeC();
@@ -221,7 +192,9 @@ public class Utils {
         return(channels);         
     }
 
-    
+    /*
+     * Generate dialog box
+     */
     public ArrayList<String> dialog(ArrayList<String> channels) {
         GenericDialogPlus gd = new GenericDialogPlus("Parameters");
         gd.setInsets​(0, 100, 0);
@@ -235,7 +208,11 @@ public class Utils {
         }
         
         gd.addMessage("CellPose", Font.getFont("Monospace"), Color.blue);
-        gd.addDirectoryField​("Env directory", "/opt/miniconda3/envs/cellpose");
+        String tempEnv = "/opt/miniconda3/envs/cellpose";
+        if (IJ.isWindows()) {
+            tempEnv = System.getProperty("user.home")+"miniconda3"+File.separator+"envs"+File.separator+"CellPose";
+        }
+        gd.addDirectoryField​("Env directory", tempEnv);
         
         gd.addMessage("Nuclei detection", Font.getFont("Monospace"), Color.blue);
         gd.addNumericField("min nucleus volume: ", minNucleusVol);
@@ -247,6 +224,7 @@ public class Utils {
 
         gd.addMessage("Image calibration and size", Font.getFont("Monospace"), Color.blue);
         gd.addNumericField("Pixel size: ", cal.pixelWidth);
+        gd.addNumericField("Pixel depth: ", cal.pixelDepth);
         gd.showDialog();
 
         if (gd.wasCanceled())
@@ -262,47 +240,53 @@ public class Utils {
         minCellVol = gd.getNextNumber();
         maxCellVol = gd.getNextNumber();
         cal.pixelWidth = cal.pixelHeight = gd.getNextNumber();
+        cal.pixelDepth = gd.getNextNumber();
+        pixelVol = cal.pixelWidth * cal.pixelHeight * cal.pixelDepth;
         
         return(channelsOrdered);
     }
      
        
     /*
-    * Look for all 3D nuclei in a Z-stack: 
-    * - apply CellPose slice by slice 
-    * - use clij to get nuclei in 3D
-    */
-   public Objects3DIntPopulation cellposeDetection(ImagePlus img, String cellposeModel, int channel, int diameter, double volMin, double volMax) throws IOException{
+     * Look for all 3D cells in a Z-stack: 
+     * - apply CellPose in 2D slice by slice 
+     * - let CellPose reconstruct cells in 3D using the stitch threshold parameters
+     */
+   public Objects3DIntPopulation cellposeDetection(ImagePlus img, String cellposeModel, int channel, int diameter, double stitchThreshold, boolean zFilter, double volMin, double volMax) throws IOException{
        // Define CellPose settings
-       CellposeTaskSettings settings = new CellposeTaskSettings(cellposeModel, channel, diameter, cellposeEnvDir);
-       settings.setStitchThreshold(0.25);
+       double resizeFactor = 0.5;
+       CellposeTaskSettings settings = new CellposeTaskSettings(cellposeModel, channel, (int)(diameter*resizeFactor), cellposeEnvDir);
+       settings.setStitchThreshold(stitchThreshold);
        settings.useGpu(true);
-       // Run CellPose
-       CellposeSegmentImgPlusAdvanced cellpose = new CellposeSegmentImgPlusAdvanced(settings, img);
-       ImagePlus imgOut = cellpose.run();
-       imgOut.setCalibration(cal);
-       imgOut.show();
-       new WaitForUserDialog("continue").show();
        
-       // Get nuclei as a population of objects
+       // Run CellPose
+       ImagePlus imgResized = img.resize((int)(img.getWidth()*resizeFactor), (int)(img.getHeight()*resizeFactor), "none");
+       CellposeSegmentImgPlusAdvanced cellpose = new CellposeSegmentImgPlusAdvanced(settings, imgResized);
+       ImagePlus imgOut = cellpose.run();
+       imgOut = imgOut.resize(img.getWidth(), img.getHeight(), "none");
+       imgOut.setCalibration(cal);
+       
+       // Get cells as a population of objects
        ImageHandler imgH = ImageHandler.wrap(imgOut);
        Objects3DIntPopulation pop = new Objects3DIntPopulation(imgH);
-       System.out.println(pop.getNbObjects() + " nuclei founds");
+       System.out.println(pop.getNbObjects() + " CellPose detections");
        
-       Objects3DIntPopulation popZ = zFilterPop(pop);
-       System.out.println(popZ.getNbObjects() + " nuclei founds");
-       Objects3DIntPopulation popZSize = sizeFilterPop(popZ, volMin, volMax);
-       System.out.println(popZSize.getNbObjects() + " nuclei founds");
-               
+       // Filter cells by size
+       if (zFilter)
+           pop = zFilterPop(pop);
+       Objects3DIntPopulationComputation popComputation = new Objects3DIntPopulationComputation​(pop);
+       Objects3DIntPopulation popFilter = popComputation.getFilterSize​(volMin/pixelVol, volMax/pixelVol);
+       System.out.println(popFilter.getNbObjects() + " detections remaining after size filtering (" + (pop.getNbObjects()-popFilter.getNbObjects()) + " filtered out)");
+       
        flush_close(imgOut);
        imgH.closeImagePlus();
-       return(popZSize);
+       return(popFilter);
    } 
    
    
-    /**
-    * Remove object with one Z
-    */
+    /*
+     * Remove objects present in only one z slice from population 
+     */
     public Objects3DIntPopulation zFilterPop (Objects3DIntPopulation pop) {
         Objects3DIntPopulation popZ = new Objects3DIntPopulation();
         for (Object3DInt obj : pop.getObjects3DInt()) {
@@ -311,366 +295,126 @@ public class Utils {
             if (zmax != zmin)
                 popZ.addObject(obj);
         }
-        resetLabels(popZ);
         return popZ;
     }
     
-    /**
-    * Filter population by size
-    */
-    public Objects3DIntPopulation sizeFilterPop(Objects3DIntPopulation pop, double volMin, double volMax) {
-        Objects3DIntPopulation popSize = new Objects3DIntPopulation();
-        for (Object3DInt object: pop.getObjects3DInt()) {
-            double vol = new MeasureVolume(object).getVolumeUnit();
-            if ((vol >= volMin) && (vol <= volMax)) {
-                popSize.addObject(object);
-            }
-        }
-        return(popSize);
-    }
-   
     
     /*
-    * Reset labels of the objects
-    */
-    public void resetLabels(Objects3DIntPopulation pop){
-        float label = 0;
-        for(Object3DInt obj: pop.getObjects3DInt()) {
-            obj.setLabel(label);
-            label++;
-        }
-    }
-    
-    
-    /**
-    * Find coloc dapi and cells
-    * return first population coloc
-    */
-    public Objects3DIntPopulation colocalization(Objects3DIntPopulation nucleiPop, Objects3DIntPopulation cellsPop) {
-        Objects3DIntPopulation colocPop = new Objects3DIntPopulation();
-        if (nucleiPop.getNbObjects() > 0 && cellsPop.getNbObjects() > 0) {
+     * Find cells colocalizing with a nucleus
+     */
+    public ArrayList<Cell> colocalization(Objects3DIntPopulation cellsPop, Objects3DIntPopulation nucleiPop) {
+        ArrayList<Cell> colocPop = new ArrayList<Cell>();
+        if (cellsPop.getNbObjects() > 0 && nucleiPop.getNbObjects() > 0) {
             MeasurePopulationColocalisation coloc = new MeasurePopulationColocalisation(nucleiPop, cellsPop);
-            coloc.computePairsValues()
-            for (Object3DInt nucleus : nucleiPop.getObjects3DInt()) {
-                for (Object3DInt cell : cellsPop.getObjects3DInt()) {
+            for (Object3DInt cell: cellsPop.getObjects3DInt()) {
+                for (Object3DInt nucleus: nucleiPop.getObjects3DInt()) {
                     double colocVal = coloc.getValueObjectsPair(nucleus, cell);
-                    System.out.println(colocVal);
-                    if (colocVal > 0) {
-                        colocPop.addObject(nucleus);
-                        Optional<Nucleus> nuc = nuclei.stream().filter(i -> i.getLabel() == obj1.getLabel()).findFirst();
-                        switch (ch) {
-                                case "GFP" :
-                                    nuc.get().setisGFP(true);
-                                    break;
-                                case "CC1" :
-                                    nuc.get().setisCC1(true);
-                                    break;    
-                        }
+                    if (colocVal > 0.5*nucleus.size()) {
+                        Object3DComputation objComputation = new Object3DComputation​(cell);
+                        Object3DInt cytoplasm = objComputation.getObjectSubtracted(nucleus);
+                        colocPop.add(new Cell(cell, nucleus, cytoplasm));
                         break;
                     }
                 }
             }
-            colocPop.setVoxelSizeXY(cal.pixelWidth);
-            colocPop.setVoxelSizeZ(cal.pixelDepth);
         }
         return(colocPop);
     }
     
-   
-   
-       // Flush and close images
+    /*
+     * Reset labels of cells in population
+     */
+    public void resetLabels(ArrayList<Cell> cellPop) {
+        float label = 1;
+        for (Cell cell: cellPop) {
+            cell.cell.setLabel(label);
+            cell.nucleus.setLabel(label);
+            cell.cytoplasm.setLabel(label);
+            label++;
+        }
+    }
+    
+    /*
+     * Set volume and intensity parameters of all cells in population
+     */
+    public void fillCellPopParameters(ArrayList<Cell> cellPop, ImagePlus img) {
+        ImageHandler imh = ImageHandler.wrap(img);
+        for (Cell cell: cellPop) {
+            cell.fillVolumes(pixelVol);
+            cell.fillIntensities(imh);
+        }
+    }
+    
+    /*
+     * Find mean volume or intensity of a population of objects
+     */
+    public double findPopMeanParam(ArrayList<Cell> pop, String parameter, String object) {
+        double sum = 0;
+        for(Cell cell: pop) {
+            sum += cell.parameters.get(object+parameter);
+        }
+        return(sum / pop.size());
+    }
+          
+    
+    /*
+     * Flush and close an image
+     */
     public void flush_close(ImagePlus img) {
         img.flush();
         img.close();
+    }             
+    
+    
+                
+    public void drawPop(Objects3DIntPopulation pop, ImagePlus img, String imgName, String outDir) {
+        ImageHandler imgObj1 = pop.drawImage();
+        ImagePlus[] imgColors1 = {imgObj1.getImagePlus(), img};
+        ImagePlus imgObjects1 = new RGBStackMerge().mergeHyperstacks(imgColors1, false);
+        imgObjects1.setCalibration(img.getCalibration());
+        FileSaver ImgObjectsFile1 = new FileSaver(imgObjects1);
+        ImgObjectsFile1.saveAsTiff(outDir + imgName + ".tif"); 
+        imgObj1.closeImagePlus();
+        flush_close(imgObjects1);
     }
-
+            
+         
+    /*
+     * Save population of cells in image
+     */
+    public void drawResults(ArrayList<Cell> pop, ImagePlus img, String imgName, String outDir) {
+        ImageHandler imgObj1 = ImageHandler.wrap(img).createSameDimensions();
+        ImageHandler imgObj2 = imgObj1.createSameDimensions();
+        ImageHandler imgObj3 = imgObj1.createSameDimensions();
+        ImageHandler imgObj4 = imgObj1.createSameDimensions();
+        if (pop.size() > 0) {
+            for (Cell cell: pop) {
+                cell.nucleus.drawObject(imgObj1);
+                cell.cytoplasm.drawObject(imgObj2);
+                cell.nucleus.drawObject(imgObj3, 255);
+                cell.cytoplasm.drawObject(imgObj4, 255);
+            } 
+        }
+       
+        ImagePlus[] imgColors1 = {null, imgObj2.getImagePlus(), imgObj1.getImagePlus()};
+        ImagePlus imgObjects1 = new RGBStackMerge().mergeHyperstacks(imgColors1, false);
+        imgObjects1.setCalibration(img.getCalibration());
+        FileSaver ImgObjectsFile1 = new FileSaver(imgObjects1);
+        ImgObjectsFile1.saveAsTiff(outDir + imgName + "_detections.tif"); 
+        imgObj1.closeImagePlus();
+        imgObj2.closeImagePlus();
+        flush_close(imgObjects1);
+        
+        ImagePlus[] imgColors2 = {null, imgObj4.getImagePlus(), imgObj3.getImagePlus(), img};
+        ImagePlus imgObjects2 = new RGBStackMerge().mergeHyperstacks(imgColors2, false);
+        imgObjects2.setCalibration(img.getCalibration());
+        FileSaver ImgObjectsFile2 = new FileSaver(imgObjects2);
+        ImgObjectsFile2.saveAsTiff(outDir + imgName + "_overlay.tif"); 
+        imgObj3.closeImagePlus();
+        imgObj4.closeImagePlus();
+        flush_close(imgObjects2);
+    }
     
-//     /**
-//     * Find volume of objects  
-//     * @param dotsPop
-//     * @return vol
-//     */
-//    
-//    public double findPopVolume (Objects3DIntPopulation dotsPop) {
-//        IJ.showStatus("Findind object's volume");
-//        List<Double[]> results = dotsPop.getMeasurementsList(new MeasureVolume().getNamesMeasurement());
-//        double sum = results.stream().map(arr -> arr[1]).reduce(0.0, Double::sum);
-//        return(sum);
-//    }
-//    
-//    /**
-//     * Find intensity of objects  
-//     * @param dotsPop
-//     * @return intensity
-//     */
-//    
-//    public double findPopIntensity (Objects3DIntPopulation dotsPop, ImagePlus img) {
-//        IJ.showStatus("Findind object's intensity");
-//        ImageHandler imh = ImageHandler.wrap(img);
-//        double sumInt = 0;
-//        for(Object3DInt obj : dotsPop.getObjects3DInt()) {
-//            MeasureIntensity intMes = new MeasureIntensity(obj, imh);
-//            sumInt +=  intMes.getValueMeasurement(MeasureIntensity.INTENSITY_SUM);
-//        }
-//        return(sumInt);
-//    }
-//    
-//    /*
-//    Check if label object exist in pop
-//    */
-//    private boolean checkObjLabel(Objects3DIntPopulation pop , Object3DInt obj) {
-//        boolean check = false;
-//        for (Object3DInt objPop : pop.getObjects3DInt()) {
-//            if (objPop.getLabel() == obj.getLabel()) {
-//                check = true;
-//                break;
-//            }
-//        }
-//        return(check);
-//    }
-//    
-//    /**
-//     * Find coloc cells
-//     * pop1 PV cells
-//     * pop2 PNN cells
-//     * @return PV cells in PNN cells
-//     */
-//    public Objects3DIntPopulation findColocCells (Objects3DIntPopulation pop1, Objects3DIntPopulation pop2, ArrayList<Cells_PV> pvCells, ImagePlus imgPNN) {
-//        Objects3DIntPopulation colocPop = new Objects3DIntPopulation();
-//        IJ.showStatus("Finding colocalized cells population ...");
-//        for(Object3DInt obj2: pop2.getObjects3DInt()) {
-//            Point3D PtObj2 =  new MeasureCentroid(obj2).getCentroidAsPoint();
-//            for(Object3DInt obj1 : pop1.getObjects3DInt()) {
-//                Point3D PtObj1 =  new MeasureCentroid(obj1).getCentroidAsPoint();
-//                double dist = PtObj1.distance(PtObj2, cal.pixelWidth, cal.pixelDepth);
-//                if ((dist <= minDist) ) {
-//                    if (!checkObjLabel(colocPop, obj1)) {
-//                        colocPop.addObject(obj1);
-//                        Cells_PV pvCell = pvCells.get((int)obj1.getLabel());
-//                        double pnnInt = new MeasureIntensity(obj2, ImageHandler.wrap(imgPNN)).getValueMeasurement(MeasureIntensity.INTENSITY_SUM);
-//                        double pnnVol = new MeasureVolume(obj2).getValueMeasurement(MeasureVolume.VOLUME_UNIT);
-//                        pvCell.setcellPV_PNN(true);
-//                        pvCell.setcellPNNInt(pnnInt);
-//                        pvCell.setcellPNNVol(pnnVol);
-//                        pvCells.set((int)obj1.getLabel(), pvCell);
-//                    }
-//                    break;
-//                }
-//            }
-//        }
-//        colocPop.setVoxelSizeXY(cal.pixelWidth);
-//        colocPop.setVoxelSizeZ(cal.pixelDepth);
-//        return(colocPop);    
-//    }
 
-//    /**
-//     * Find dots in cells
-//     * @param pop1 pv cells
-//     * @param pop2 dots
-//     * @param pvCells
-//     * @param img
-//     * @param channel GFP or DAPI
-//     * @return 
-//     */
-//    public Objects3DIntPopulation colocDotsCells (Objects3DIntPopulation cellsPop, Objects3DIntPopulation dotsPop, ArrayList<Cells_PV> pvCells, ImagePlus img, String channel) {
-//        Objects3DIntPopulation colocPop = new Objects3DIntPopulation();
-//        IJ.showStatus("Finding dots in cells population ...");
-//        MeasurePopulationColocalisation coloc = new MeasurePopulationColocalisation(cellsPop, dotsPop);
-//        ResultsTable table = coloc.getResultsTableOnlyColoc();
-//        table.show("coloc");
-//        for (Object3DInt cellObj : cellsPop.getObjects3DInt()) {
-//            int cellIndex = (int)cellObj.getLabel();
-//            IJ.showStatus("Finding "+channel+" foci in PV cell "+cellIndex+"/"+cellsPop.getNbObjects());
-//            Cells_PV pvCell = pvCells.get(cellIndex);
-//            int dots = 0;
-//            double dotsVol = 0;
-//            double dotsInt = 0;
-//            for (Object3DInt dotObj : dotsPop.getObjects3DInt()) {
-//                double colocVal = coloc.getValueObjectsPair(cellObj, dotObj);
-//                if (colocVal > 0) {
-//                    dots++;
-//                    dotsVol += new MeasureVolume(dotObj).getVolumeUnit();
-//                    dotsInt += new MeasureIntensity(dotObj, ImageHandler.wrap(img)).getValueMeasurement(MeasureIntensity.INTENSITY_SUM);
-//                    colocPop.addObject(dotObj);
-//                }
-//            }
-//            switch (channel) {
-//                case "GFP":
-//                    pvCell.setnbFoci(dots);
-//                    pvCell.setfociVol(dotsVol);
-//                    pvCell.setfociInt(dotsInt);
-//                    break;
-//                case "DAPI":
-//                    pvCell.setnbDapiFoci(dots);
-//                    pvCell.setfociDapiVol(dotsVol);
-//                    pvCell.setfociDapiInt(dotsInt);
-//                    break;
-//                default :
-//            }
-//            pvCells.set(cellIndex, pvCell);
-//        }
-//        colocPop.setVoxelSizeXY(cal.pixelWidth);
-//        colocPop.setVoxelSizeZ(cal.pixelDepth);
-//        return(colocPop);    
-//    }
-//    
-//     /**
-//     * Label object
-//     * @param popObj
-//     * @param img 
-//     */
-//    public void labelsObject (Object3DInt obj, ImageHandler imh) {
-//        int fontSize = Math.round(8f/(float)imh.getCalibration().pixelWidth);
-//        Font tagFont = new Font("SansSerif", Font.PLAIN, fontSize);
-//        float label = obj.getLabel();
-//        BoundingBox box = obj.getBoundingBox();
-//        int z = box.zmin;
-//        int x = box.xmin - 2;
-//        int y = box.ymin - 2;
-//        imh.getImagePlus().setSlice(z+1);
-//        ImageProcessor ip = imh.getImagePlus().getProcessor();
-//        ip.setFont(tagFont);
-//        ip.setColor(255);
-//        ip.drawString(Integer.toString((int)label), x, y);
-//        imh.getImagePlus().updateAndDraw();
-//    }
-//   
-//    /**
-//     * Save dots Population in image
-//     * @param pop1 PV cells
-//     * @param pop2 PNN cells
-//     * @param pop3 fociGFP
-//     * @param pop4 fociDAPI
-//     * @param pop5 PV/PNN
-//     * @param imageName
-//     * @param img 
-//     * @param outDir 
-//     */
-//    public void saveImgObjects(Objects3DIntPopulation pop1, Objects3DIntPopulation pop2, Objects3DIntPopulation pop3, Objects3DIntPopulation pop4, 
-//            Objects3DIntPopulation pop5, String imageName, ImagePlus img, String outDir) {
-//        //create image objects population
-//        
-//
-//        //PV cells green
-//        ImageHandler imgObj1 = ImageHandler.wrap(img).createSameDimensions();
-//        if (pop1.getNbObjects() > 0)
-//            for (Object3DInt obj : pop1.getObjects3DInt())
-//                obj.drawObject(imgObj1, 255);
-//        
-//        //PNN cells red
-//        ImageHandler imgObj2 = imgObj1.createSameDimensions();
-//        if (pop2.getNbObjects() > 0)
-//            for (Object3DInt obj : pop2.getObjects3DInt())
-//                obj.drawObject(imgObj2, 255);
-//        
-//        // Foci GFP cyan
-//        ImageHandler imgObj3 = imgObj1.createSameDimensions();
-//        if (pop3.getNbObjects() > 0)
-//            for (Object3DInt obj : pop3.getObjects3DInt())
-//                obj.drawObject(imgObj3, 255);        
-//        
-//        // Foci DAPI blue
-//        ImageHandler imgObj4 = imgObj1.createSameDimensions();
-//        if (pop4.getNbObjects() > 0) 
-//            for (Object3DInt obj : pop4.getObjects3DInt())
-//                obj.drawObject(imgObj4, 255);
-//        
-//        // PV/PNN yellow
-//        ImageHandler imgObj5 = imgObj1.createSameDimensions();
-//        if (pop5.getNbObjects() > 0) {
-//            for (Object3DInt obj : pop5.getObjects3DInt()) {
-//                    labelsObject(obj, imgObj5);
-//                    obj.drawObject(imgObj5, 255);
-//            }
-//        }
-//   
-//        // save image for objects population
-//        ImagePlus[] imgColors = {imgObj2.getImagePlus(), imgObj1.getImagePlus(), imgObj4.getImagePlus(), null, imgObj3.getImagePlus(),null,imgObj5.getImagePlus() };
-//        ImagePlus imgObjects = new RGBStackMerge().mergeHyperstacks(imgColors, false);
-//        imgObjects.setCalibration(img.getCalibration());
-//        FileSaver ImgObjectsFile = new FileSaver(imgObjects);
-//        ImgObjectsFile.saveAsTiff(outDir + imageName + "_Objects.tif"); 
-//        imgObj1.closeImagePlus();
-//        imgObj2.closeImagePlus();
-//        imgObj3.closeImagePlus();
-//        imgObj4.closeImagePlus();
-//        imgObj5.closeImagePlus();
-//        flush_close(imgObjects);
-//    }
-//    
-
-//    
-///**
-//     * 
-//     * @param xmlFile
-//     * @return
-//     * @throws ParserConfigurationException
-//     * @throws SAXException
-//     * @throws IOException 
-//     */
-//    public ArrayList<Point3DInt> readXML(String xmlFile) throws ParserConfigurationException, SAXException, IOException {
-//        ArrayList<Point3DInt> ptList = new ArrayList<>();
-//        int x = 0, y = 0 ,z = 0;
-//        File fXmlFile = new File(xmlFile);
-//        DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
-//	DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
-//	Document doc = dBuilder.parse(fXmlFile);
-//        doc.getDocumentElement().normalize();
-//        NodeList nList = doc.getElementsByTagName("Marker");
-//        for (int n = 0; n < nList.getLength(); n++) {
-//            Node nNode = nList.item(n);
-//            if (nNode.getNodeType() == Node.ELEMENT_NODE) {
-//                Element eElement = (Element) nNode;
-//                x = Integer.parseInt(eElement.getElementsByTagName("MarkerX").item(0).getTextContent());
-//                y = Integer.parseInt(eElement.getElementsByTagName("MarkerY").item(0).getTextContent());
-//                z = Integer.parseInt(eElement.getElementsByTagName("MarkerZ").item(0).getTextContent())-zSlicesToIgnore;
-//            }
-//            Point3DInt pt = new Point3DInt(x, y, z);
-//            ptList.add(pt);
-//        }
-//        return(ptList);
-//    }
-   
-    
-//     /**
-//     * return objects population in an ClearBuffer image
-//     * @param imgCL
-//     * @return pop objects population
-//     */
-//
-//    public Objects3DIntPopulation getPopFromClearBuffer(ClearCLBuffer imgBin, double min, double max) {
-//        ClearCLBuffer labelsCL = clij2.create(imgBin);
-//        clij2.connectedComponentsLabelingBox(imgBin, labelsCL);
-//        ClearCLBuffer labelsSizeFilter = clij2.create(imgBin);
-//        // filter size
-//        clij2.excludeLabelsOutsideSizeRange(labelsCL, labelsSizeFilter, min/(cal.pixelWidth*cal.pixelWidth*cal.pixelDepth),
-//                max/(cal.pixelWidth*cal.pixelWidth*cal.pixelDepth));
-//        clij2.release(labelsCL);
-//        ImagePlus img = clij2.pull(labelsSizeFilter);
-//        clij2.release(labelsSizeFilter);
-//        ImageHandler imh = ImageHandler.wrap(img);
-//        flush_close(img);
-//        Objects3DIntPopulation pop = new Objects3DIntPopulation(imh);
-//        pop.setVoxelSizeXY(cal.pixelWidth);
-//        pop.setVoxelSizeZ(cal.pixelDepth);
-//        imh.closeImagePlus();
-//        return(pop);
-//    }  
-//    
-//    
-//    
-//    /**
-//    Fill cells parameters
-//    */
-//    public void pvCellsParameters (Objects3DIntPopulation cellsPop, ArrayList<Cells_PV> pvCells, ImagePlus imgPv, ImagePlus imgGFP) {
-//        for (Object3DInt obj : cellsPop.getObjects3DInt()) {
-//            double pvVol = new MeasureVolume(obj).getVolumeUnit();
-//            double pvInt = new MeasureIntensity(obj, ImageHandler.wrap(imgPv)).getValueMeasurement(MeasureIntensity.INTENSITY_SUM);
-//            double pvGFPInt = new MeasureIntensity(obj, ImageHandler.wrap(imgGFP)).getValueMeasurement(MeasureIntensity.INTENSITY_SUM);
-//            Cells_PV pv = new Cells_PV(pvVol, pvInt, pvGFPInt, false, 0, 0, 0, 0, 0, 0, 0, 0);
-//            pvCells.add(pv);
-//        }
-//        
-//    } 
     
 }

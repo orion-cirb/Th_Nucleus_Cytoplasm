@@ -1,35 +1,27 @@
-import com.sun.jna.StringArray;
 import ij.IJ;
 import ij.ImagePlus;
+import ij.plugin.PlugIn;
+import org.apache.commons.io.FilenameUtils;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
+import java.io.FileWriter;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.xml.parsers.ParserConfigurationException;
-import org.xml.sax.SAXException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import loci.common.services.DependencyException;
 import loci.common.services.ServiceException;
-import loci.formats.FormatException;
 import loci.common.services.ServiceFactory;
+import loci.formats.FormatException;
 import loci.formats.meta.IMetadata;
 import loci.formats.services.OMEXMLService;
 import loci.plugins.BF;
-import loci.plugins.util.ImageProcessorReader;
-import ij.plugin.Duplicator;
-import ij.plugin.PlugIn;
-import java.io.FileWriter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 import loci.plugins.in.ImporterOptions;
-import mcib3d.geom.Objects3DPopulation;
+import loci.plugins.util.ImageProcessorReader;
 import mcib3d.geom2.Objects3DIntPopulation;
-import org.apache.commons.io.FilenameUtils;
-import org.bridj.ann.Array;
 
 
 
@@ -39,7 +31,7 @@ import org.bridj.ann.Array;
  */
 public class Th_Nucleus_Cytoplasm implements PlugIn {
     
-    Utils tools = new Utils();
+    Utils utils = new Utils();
     private boolean canceled = false;
     private String imageDir = "";
     public  String outDirResults = "";
@@ -55,7 +47,7 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
                 return;
             }
             
-            if (! tools.checkInstalledModules()) {
+            if (! utils.checkInstalledModules()) {
                 return;
             }      
                     
@@ -65,8 +57,8 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
             }
             
             // Find images with specific extension
-            fileExt = tools.findImageType(new File(imageDir));           
-            ArrayList<String> imageFiles = tools.findImages(imageDir, fileExt);            
+            fileExt = utils.findImageType(new File(imageDir));           
+            ArrayList<String> imageFiles = utils.findImages(imageDir, fileExt);            
             if (imageFiles == null) {
                 IJ.showMessage("Error", "No images found with " + fileExt + " extension");
                 return;
@@ -79,14 +71,14 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
                 outDir.mkdir();
             }
             
-            // Write headers
-            String header = "Image name\tNucleus ID\tNucleus volume (µm3)\tNucleus sphericity\tNucleus intensity\tNucleus corrected intensity\t"
-                    + "Cytoplasm volume (µm3)\tCytoplasm intensity\tCytoplasm corrected intensity\n";
-            FileWriter fwCells = new FileWriter(outDirResults + "cellsResults.xls", false);
+            // Write headers in results files
+            String header = "Image name\tCell ID\tCell volume (µm3)\tCell 561 intensity\tNucleus volume (µm3)\tNucleus 561 intensity"
+                    + "\tCytoplasm volume (µm3)\tCytoplasm 561 intensity\n";
+            FileWriter fwCells = new FileWriter(outDirResults + "detailedResults.xls", false);
             cellsResults = new BufferedWriter(fwCells);
             cellsResults.write(header);
             cellsResults.flush();
-            header = "Image name\tNb nuclei\tBackground mean intensity\tBackground intensity std\n";
+            header = "Image name\tVolume (µm3)\tNb cells\tCells mean volume (µm3)\tCells mean 561 intensity\tNuclei mean volume (µm3)\tNuclei mean 561 intensity\tCytoplasms mean volume (µm3)\tCytoplasm mean 561 intensity\n";
             FileWriter fwGlobal = new FileWriter(outDirResults + "globalResults.xls", false);
             globalResults = new BufferedWriter(fwGlobal);
             globalResults.write(header);
@@ -102,20 +94,21 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
             reader.setId(imageFiles.get(0));
 
             // Find image calibration
-            tools.cal = tools.findImageCalib(meta);
+            utils.cal = utils.findImageCalib(meta);
             
             // Find channels names
-            ArrayList<String> channels = tools.findChannels(imageFiles.get(0), meta, reader, channelsName);
+            ArrayList<String> channels = utils.findChannels(imageFiles.get(0), meta, reader, channelsName);
 
             // Channels dialog
-            ArrayList<String> channelsOrdered = tools.dialog(channels);
-            if (channelsOrdered == null || tools.canceled) {
-                IJ.showStatus("Plugin cancelled");
+            ArrayList<String> channelsOrdered = utils.dialog(channels);
+            if (channelsOrdered == null || utils.canceled) {
+                IJ.showMessage("Plugin cancelled");
                 return;
             }
             
             for (String f : imageFiles) {
                 String rootName = FilenameUtils.getBaseName(f);
+                utils.print("--- ANALYZING IMAGE " + rootName + " ------");
                 reader.setId(f);
                 
                 ImporterOptions options = new ImporterOptions();   
@@ -126,111 +119,68 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
                 options.setColorMode(ImporterOptions.COLOR_MODE_GRAYSCALE);
                        
                 //  Open nuclei channel
-                System.out.println("Opening " + channelsName.get(0) + " channel " + channelsOrdered.get(0) + "...");
+                utils.print("- Analyzing " + channelsName.get(0) + " channel " + channelsOrdered.get(0) + " -");
                 int channelNuclei = channels.indexOf(channelsOrdered.get(0));
-                ImagePlus imgNuclei = BF.openImagePlus(options)[channelNuclei];
-                
-                /*//Compute section volume in µm^3
-                double pixVol = tools.cal.pixelWidth * tools.cal.pixelHeight * tools.cal.pixelDepth;
-                double sectionVol = imgNuclei.getWidth() * imgNuclei.getHeight() * imgNuclei.getNSlices() * pixVol;*/
-                
+                ImagePlus imgNuclei = BF.openImagePlus(options)[channelNuclei];                
                 // Find nuclei
                 Objects3DIntPopulation nucleiPop = new Objects3DIntPopulation();
-                nucleiPop = tools.cellposeDetection(imgNuclei, "cyto", 1, 80, tools.minNucleusVol, tools.maxNucleusVol);
-                System.out.println(nucleiPop.getNbObjects() + " nuclei founds");
+                nucleiPop = utils.cellposeDetection(imgNuclei, "cyto", 1, 80, 0.5, false, utils.minNucleusVol, utils.maxNucleusVol);
+                System.out.println(nucleiPop.getNbObjects() + " " + channelsName.get(0) + " found");
+                utils.drawPop(nucleiPop, imgNuclei.duplicate(), rootName+"_allNuclei", outDirResults);
+                utils.flush_close(imgNuclei);
                 
                 // Open Th cells channel
-                System.out.println("Opening " + channelsName.get(1) + " channel " + channelsOrdered.get(1) + "...");
+                utils.print("- Analyzing " + channelsName.get(1) + " channel " + channelsOrdered.get(1) + " -");
                 int channelTh = channels.indexOf(channelsOrdered.get(1));
                 ImagePlus imgTh = BF.openImagePlus(options)[channelTh];
-                
                 // Find TH cells
                 Objects3DIntPopulation thPop = new Objects3DIntPopulation();
-                thPop = tools.cellposeDetection(imgTh, "cyto", 1, 100, tools.minCellVol, tools.maxCellVol);
-                System.out.println(thPop.getNbObjects() + " Th cells founds");
+                thPop = utils.cellposeDetection(imgTh, "cyto2", 1, 100, 0.5, true, utils.minCellVol, utils.maxCellVol);
+                System.out.println(thPop.getNbObjects() + " " + channelsName.get(1) + " found");
+                utils.drawPop(thPop, imgTh.duplicate(), rootName+"_allCells", outDirResults);
+                        
+                // Colocalization
+                utils.print("- Performing colocalization between " + channelsName.get(0) + " and " + channelsName.get(1) + " -");
+                ArrayList<Cell> colocPop = utils.colocalization(thPop, nucleiPop);
+                System.out.println(colocPop.size() + " " + channelsName.get(1) + " colocalized with " + channelsName.get(0));
+                utils.resetLabels(colocPop);
                 
-                /*// Find inner/outer ring nucleus
-                // outer
-                System.out.println("Finding outer ring ....");
-                Objects3DPopulation outerRingPop = tools.createDonutPop(nucPop, imgZCropNuc, tools.outerNucDil, true);
-                // inner
-                System.out.println("Finding inner ring ....");
-                Objects3DPopulation innerRingPop = tools.createDonutPop(nucPop, imgZCropNuc, tools.innerNucDil, false);
-                // inner nucleus
-                System.out.println("Finding inner nucleus ....");
-                Objects3DPopulation innerNucPop = tools.getInnerNucleus(nucPop, imgZCropNuc, tools.innerNucDil, false);
-                
-                tools.closeImages(imgZCropNuc);
-                   
-                // open OFRP1 Channel
-                System.out.println("Opening OFR1P channel " + channels.get(1)+ " ...");
-                channel = channels.indexOf(chs.get(1));
-                ImagePlus imgOFR1P = BF.openImagePlus(options)[channel];
-                
-                // Take same stack as nucleus
-                ImagePlus imgZCropOFR1P = new Duplicator().run(imgOFR1P, tools.zMax, imgOFR1P.getNSlices());
-                tools.closeImages(imgOFR1P);
-                
-                // Find background
-                double[] bgOFR1P = tools.find_background(imgZCropOFR1P);
-                
-                // Find cell cytoplasm
-                Objects3DPopulation cellPop = tools.findCells(imgZCropOFR1P, nucPop);
-                
-                // mask OFR1P with nucleus object
-                ImagePlus imgOFR1P_NucleusMask = tools.maskImage(imgZCropOFR1P, nucPop, outDirResults, rootName+"_nucleusMasked.tif");
-                
-                 // read all intensity in OFR1P nucleus masked channel
-                double sumNucMaskedIntensity = tools.readSumIntensity(imgOFR1P_NucleusMask, 0, null);
-                
-                // mask OFR1P with nucleus and cell object
-                ImagePlus imgOFR1P_CellMask = tools.maskImage(imgOFR1P_NucleusMask, cellPop, outDirResults, rootName+"_CellsMasked.tif");
-                
-                tools.closeImages(imgOFR1P_NucleusMask);
-                // read all intensity in OFR1P nucleus cells masked channel
-                double sumCellMaskedIntensity = tools.readSumIntensity(imgOFR1P_CellMask, bgOFR1P[0]+bgOFR1P[1], outDirResults+rootName+"_CellProcesses.tif");
-                tools.closeImages(imgOFR1P_CellMask);
-                
-                // Dots detections
-                // All dots population
-                Objects3DPopulation allDotsPop = new Objects3DPopulation();
-                if (tools.dotsDetect)
-                    allDotsPop = tools.find_dots(imgZCropOFR1P, 2, 1, "Triangle");
-
+                //  Open 561 channel
+                utils.print("- Measuring intensities in " + channelsName.get(2) + " channel " + channelsOrdered.get(2) + " -");
+                int channel561 = channels.indexOf(channelsOrdered.get(2));
+                ImagePlus img561 = BF.openImagePlus(options)[channel561];    
+                utils.fillCellPopParameters(colocPop, img561);
+                utils.flush_close(img561);
+                               
                 // Save image objects
-                tools.saveImageObjects(nucPop, outerRingPop, null, imgZCropOFR1P, outDirResults+rootName+"_OuterRingObjects.tif", 40);
-                tools.saveImageObjects(innerRingPop, innerNucPop, null, imgZCropOFR1P, outDirResults+rootName+"_innerRingObjects.tif", 40);
-                if (tools.dotsDetect)
-                    tools.saveImageObjects(nucPop, allDotsPop, cellPop, imgZCropOFR1P, outDirResults+rootName+"_dotsObjects.tif", 40);
-                
-                // tags nucleus with parameters
-                ArrayList<Nucleus> nucleus = tools.tagsNuclei(imgZCropOFR1P, nucPop, innerNucPop, innerRingPop, outerRingPop, cellPop, allDotsPop);
-                             
-                // Write results
-                for (Nucleus nuc : nucleus) {
-                    nucleus_Analyze.write(rootName+"\t"+nuc.getIndex()+"\t"+nuc.getNucVol()+"\t"+nuc.getNucCir()+"\t"+nuc.getNucInt()+"\t"+(nuc.getNucInt() - bgOFR1P[0] * (nuc.getNucVol()/volPix)) +"\t"+nuc.getNucDots()+"\t"+nuc.getNucDotsVol()+"\t"+nuc.getNucDotsInt()+
-                            "\t"+nuc.getInnerNucVol()+"\t"+nuc.getInnerNucInt()+"\t"+(nuc.getInnerNucInt() - bgOFR1P[0] * (nuc.getInnerNucVol()/volPix))+"\t"+nuc.getInnerNucDots()+"\t"+nuc.getInnerNucDotsVol()+"\t"+nuc.getInnerNucDotsInt()+
-                            "\t"+nuc.getInnerRingVol()+"\t"+nuc.getInnerRingInt()+"\t"+(nuc.getInnerRingInt() - bgOFR1P[0] * (nuc.getInnerRingVol()/volPix))+"\t"+nuc.getInnerRingDots()+"\t"+nuc.getInnerRingDotsVol()+"\t"+nuc.getInnerRingDotsInt()+
-                            "\t"+nuc.getOuterRingVol()+"\t"+nuc.getOuterRingInt()+"\t"+(nuc.getOuterRingInt() - bgOFR1P[0] * (nuc.getOuterRingVol()/volPix))+"\t"+nuc.getOuterRingDots()+"\t"+nuc.getOuterRingDotsVol()+"\t"+nuc.getOuterRingDotsInt()+
-                            "\t"+nuc.getCytoVol()+"\t"+nuc.getCytoInt()+"\t"+(nuc.getCytoInt() - bgOFR1P[0] * (nuc.getCytoVol()/volPix))+"\t"+nuc.getCytoDots()+"\t"+nuc.getCytoDotsVol()+"\t"+nuc.getCytoDotsInt()+"\n");
-                    nucleus_Analyze.flush();
+                utils.print("- Saving results -");
+                utils.drawResults(colocPop, imgTh, rootName, outDirResults);
+            
+                // Write detailed results
+                for(Cell cell: colocPop) {
+                    cellsResults.write(rootName+"\t"+cell.cell.getLabel()+"\t"+cell.parameters.get("cellVol")+"\t"+cell.parameters.get("cellInt")+
+                            "\t"+cell.parameters.get("nucleusVol")+"\t"+cell.parameters.get("nucleusInt")+
+                            "\t"+cell.parameters.get("cytoplasmVol")+"\t"+cell.parameters.get("cytoplasmInt")+"\n");
+                    cellsResults.flush();
                 }
-                // Global measurements
                 
-                nucleusGlobal_Analyze.write(rootName+"\t"+nucPop.getNbObjects()+"\t"+sectionVol+"\t"+bgOFR1P[0]+"\t"+bgOFR1P[1]+"\t"+sumNucMaskedIntensity+"\t"+sumCellMaskedIntensity+"\n");
-                nucleusGlobal_Analyze.flush();               
-                tools.closeImages(imgZCropOFR1P);*/
-                break;
+                // Write global results
+                double imgVol = imgTh.getWidth() * imgTh.getHeight() * imgTh.getNSlices() * utils.pixelVol;
+                globalResults.write(rootName+"\t"+imgVol+"\t"+colocPop.size()+"\t"+utils.findPopMeanParam(colocPop, "Vol", "cell")+"\t"+
+                        utils.findPopMeanParam(colocPop, "Int", "cell")+"\t"+utils.findPopMeanParam(colocPop, "Vol", "nucleus")+"\t"+
+                        utils.findPopMeanParam(colocPop, "Int", "nucleus")+"\t"+utils.findPopMeanParam(colocPop, "Vol", "cytoplasm")+"\t"+
+                        utils.findPopMeanParam(colocPop, "Int", "cytoplasm")+"\n");
+                globalResults.flush();
+                utils.flush_close(imgTh);
             }
             
             cellsResults.close();
             globalResults.close();
             
-        } catch (IOException | DependencyException | io.scif.DependencyException | ServiceException | FormatException ex) { //  |  ParserConfigurationException | SAXException ex
-            //Logger.getLogger(Th_Nucleus_Cytoplasm.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IOException | DependencyException | ServiceException | FormatException ex) {
+            Logger.getLogger(Th_Nucleus_Cytoplasm.class.getName()).log(Level.SEVERE, null, ex);
         }
        
-        
-        IJ.showStatus("Process done!");
+        utils.print("--- All done! ---");
     }
 }
