@@ -26,8 +26,8 @@ import mcib3d.geom2.Objects3DIntPopulation;
 
 
 /*
- * Detect DAPI nuclei and Th cells
- * Find intensity in 561 channel
+ * Detect DAPI nuclei and TH cells
+ * Find intensity in ORF1p channel
  */
 public class Th_Nucleus_Cytoplasm implements PlugIn {
     
@@ -36,7 +36,7 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
     private String imageDir = "";
     public  String outDirResults = "";
     public String fileExt;
-    public ArrayList<String> channelsName = new ArrayList<String>(Arrays.asList("DAPI nuclei", "Th cells", "561"));
+    public ArrayList<String> channelsName = new ArrayList<String>(Arrays.asList("DAPI", "TH", "ORF1p"));
     public BufferedWriter globalResults;
     public BufferedWriter cellsResults;
     
@@ -72,13 +72,15 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
             }
             
             // Write headers in results files
-            String header = "Image name\tCell ID\tCell volume (µm3)\tCell 561 intensity\tNucleus volume (µm3)\tNucleus 561 intensity"
-                    + "\tCytoplasm volume (µm3)\tCytoplasm 561 intensity\n";
+            String header = "Image name\tCell ID\tCell volume (µm3)\tCell ORF1p intensity\tNucleus volume (µm3)\tNucleus ORF1p intensity"
+                    + "\tCytoplasm volume (µm3)\tCytoplasm ORF1p intensity\n";
             FileWriter fwCells = new FileWriter(outDirResults + "detailedResults.xls", false);
             cellsResults = new BufferedWriter(fwCells);
             cellsResults.write(header);
             cellsResults.flush();
-            header = "Image name\tVolume (µm3)\tNb cells\tCells mean volume (µm3)\tCells mean 561 intensity\tNuclei mean volume (µm3)\tNuclei mean 561 intensity\tCytoplasms mean volume (µm3)\tCytoplasm mean 561 intensity\n";
+            header = "Image name\tVolume (µm3)\tNb cells\tCells mean volume (µm3)\tCells mean ORF1p intensity\tNuclei mean volume (µm3)"
+                    + "\tNuclei mean ORF1p intensity\tCytoplasms mean volume (µm3)\tCytoplasm mean ORF1p intensity"
+                    + "\tNb TH-negative nuclei\tTH-negative nuclei mean ORF1p intensity\n";
             FileWriter fwGlobal = new FileWriter(outDirResults + "globalResults.xls", false);
             globalResults = new BufferedWriter(fwGlobal);
             globalResults.write(header);
@@ -118,42 +120,39 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
                 options.setCrop(true);
                 options.setColorMode(ImporterOptions.COLOR_MODE_GRAYSCALE);
                        
-                //  Open nuclei channel
-                utils.print("- Analyzing " + channelsName.get(0) + " channel " + channelsOrdered.get(0) + " -");
-                int channelNuclei = channels.indexOf(channelsOrdered.get(0));
-                ImagePlus imgNuclei = BF.openImagePlus(options)[channelNuclei];                
-                // Find nuclei
-                Objects3DIntPopulation nucleiPop = new Objects3DIntPopulation();
-                nucleiPop = utils.cellposeDetection(imgNuclei, "cyto", 1, 80, 0.5, false, utils.minNucleusVol, utils.maxNucleusVol);
-                System.out.println(nucleiPop.getNbObjects() + " " + channelsName.get(0) + " found");
-                utils.drawPop(nucleiPop, imgNuclei.duplicate(), rootName+"_allNuclei", outDirResults);
-                utils.flush_close(imgNuclei);
+                //  Open DAPI channel
+                utils.print("- Analyzing " + channelsName.get(0) + " channel -");
+                int channelDAPI = channels.indexOf(channelsOrdered.get(0));
+                ImagePlus imgDAPI = BF.openImagePlus(options)[channelDAPI];                
+                // Find DAPI nuclei
+                Objects3DIntPopulation dapiPop = new Objects3DIntPopulation();
+                dapiPop = utils.cellposeDetection(imgDAPI, "cyto", 1, 80, 0.5, false, utils.minNucleusVol, utils.maxNucleusVol);
+                System.out.println(dapiPop.getNbObjects() + " " + channelsName.get(0) + " nuclei found");
                 
-                // Open Th cells channel
-                utils.print("- Analyzing " + channelsName.get(1) + " channel " + channelsOrdered.get(1) + " -");
+                // Open Th channel
+                utils.print("- Analyzing " + channelsName.get(1) + " channel -");
                 int channelTh = channels.indexOf(channelsOrdered.get(1));
                 ImagePlus imgTh = BF.openImagePlus(options)[channelTh];
-                // Find TH cells
+                // Find Th cells
                 Objects3DIntPopulation thPop = new Objects3DIntPopulation();
                 thPop = utils.cellposeDetection(imgTh, "cyto2", 1, 100, 0.5, true, utils.minCellVol, utils.maxCellVol);
-                System.out.println(thPop.getNbObjects() + " " + channelsName.get(1) + " found");
-                utils.drawPop(thPop, imgTh.duplicate(), rootName+"_allCells", outDirResults);
+                System.out.println(thPop.getNbObjects() + " " + channelsName.get(1) + " cells found");
                         
                 // Colocalization
-                utils.print("- Performing colocalization between " + channelsName.get(0) + " and " + channelsName.get(1) + " -");
-                ArrayList<Cell> colocPop = utils.colocalization(thPop, nucleiPop);
-                System.out.println(colocPop.size() + " " + channelsName.get(1) + " colocalized with " + channelsName.get(0));
+                utils.print("- Performing colocalization between " + channelsName.get(0) + " nuclei and " + channelsName.get(1) + " cells -");
+                ArrayList<Cell> colocPop = utils.colocalization(thPop, dapiPop);
+                System.out.println(colocPop.size() + " " + channelsName.get(1) + " cells colocalized with " + channelsName.get(0) + " nuclei");
                 utils.resetLabels(colocPop);
                 
-                //  Open 561 channel
-                utils.print("- Measuring intensities in " + channelsName.get(2) + " channel " + channelsOrdered.get(2) + " -");
-                int channel561 = channels.indexOf(channelsOrdered.get(2));
-                ImagePlus img561 = BF.openImagePlus(options)[channel561];    
-                utils.fillCellPopParameters(colocPop, img561);
-                utils.flush_close(img561);
+                //  Open ORF1p channel
+                utils.print("- Measuring intensities in " + channelsName.get(2) + " channel -");
+                int channelORF1p = channels.indexOf(channelsOrdered.get(2));
+                ImagePlus imgORF1p = BF.openImagePlus(options)[channelORF1p];    
+                utils.fillCellPopParameters(colocPop, imgORF1p);
                                
                 // Save image objects
                 utils.print("- Saving results -");
+                utils.drawNuclei(dapiPop, imgDAPI, rootName, outDirResults);
                 utils.drawResults(colocPop, imgTh, rootName, outDirResults);
             
                 // Write detailed results
@@ -165,13 +164,17 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
                 }
                 
                 // Write global results
+                double[] nucleiParams = utils.getNucleiParams(dapiPop, imgORF1p);
                 double imgVol = imgTh.getWidth() * imgTh.getHeight() * imgTh.getNSlices() * utils.pixelVol;
                 globalResults.write(rootName+"\t"+imgVol+"\t"+colocPop.size()+"\t"+utils.findPopMeanParam(colocPop, "Vol", "cell")+"\t"+
                         utils.findPopMeanParam(colocPop, "Int", "cell")+"\t"+utils.findPopMeanParam(colocPop, "Vol", "nucleus")+"\t"+
                         utils.findPopMeanParam(colocPop, "Int", "nucleus")+"\t"+utils.findPopMeanParam(colocPop, "Vol", "cytoplasm")+"\t"+
-                        utils.findPopMeanParam(colocPop, "Int", "cytoplasm")+"\n");
+                        utils.findPopMeanParam(colocPop, "Int", "cytoplasm")+"\t"+((int) nucleiParams[0])+"\t"+nucleiParams[1]+"\n");
                 globalResults.flush();
+                
+                utils.flush_close(imgDAPI);
                 utils.flush_close(imgTh);
+                utils.flush_close(imgORF1p);
             }
             
             cellsResults.close();
