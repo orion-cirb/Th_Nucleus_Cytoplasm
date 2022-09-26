@@ -211,7 +211,7 @@ public class Utils {
         gd.addMessage("CellPose", Font.getFont("Monospace"), Color.blue);
         String tempEnv = "/opt/miniconda3/envs/cellpose";
         if (IJ.isWindows()) {
-            tempEnv = System.getProperty("user.home")+"miniconda3"+File.separator+"envs"+File.separator+"CellPose";
+            tempEnv = System.getProperty("user.home")+File.separator+"miniconda3"+File.separator+"envs"+File.separator+"CellPose";
         }
         gd.addDirectoryField​("Env directory", tempEnv);
         
