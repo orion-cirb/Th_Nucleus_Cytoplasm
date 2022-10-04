@@ -35,7 +35,7 @@ public class CellposeTask {
         options.add("" + settings.flow_threshold);
        
 
-        if(settings.verbose) System.out.println("Cellpose version is set to:" + settings.version);
+        System.out.println("Cellpose version is set to:" + settings.version);
         if (settings.version.equals("0.6") || settings.version.equals("2.0")) {
             options.add("--cellprob_threshold");
         } else if (settings.version.equals("0.7") || settings.version.equals("1.0")) {
