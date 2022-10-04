@@ -78,7 +78,7 @@ public class CellposeSegmentImgPlusAdvanced {
                 File t_imp_path = new File(cellposeTempDir, imp.getShortTitle() + "-t" + t_idx + ".tif");
                 FileSaver fs = new FileSaver(t_imp);
                 fs.saveAsTiff(t_imp_path.toString());
-                System.out.println(t_imp_path.toString());
+                if(settings.verbose) System.out.println(t_imp_path.toString());
                 // Add to list of paths to delete at the end of operations
                 t_imp_paths.add(t_imp_path);
 
