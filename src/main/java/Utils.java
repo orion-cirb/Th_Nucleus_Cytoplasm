@@ -149,8 +149,10 @@ public class Utils {
       * @throws java.io.IOException
       */
     public ArrayList<String> findChannels(String imageName, IMetadata meta, ImageProcessorReader reader, ArrayList<String> channelsName) throws DependencyException, ServiceException, FormatException, IOException {
-        this.channelsName = channelsName;
         int nbChannels = reader.getSizeC();
+        if (nbChannels == 4)
+            channelsName.add("Neun");
+        this.channelsName = channelsName;
         ArrayList<String> channels = new ArrayList<String>();
         String imageExtension =  FilenameUtils.getExtension(imageName);
         switch (imageExtension) {
