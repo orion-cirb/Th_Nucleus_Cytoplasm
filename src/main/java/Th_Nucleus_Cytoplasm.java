@@ -122,8 +122,8 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
                        
                 //  Open DAPI channel
                 utils.print("- Analyzing " + channelsName.get(0) + " channel -");
-                int channelIndex = channels.indexOf(channelsOrdered.get(0));
-                ImagePlus imgDAPI = BF.openImagePlus(options)[channelIndex];                
+                int channelDAPI = channels.indexOf(channelsOrdered.get(0));
+                ImagePlus imgDAPI = BF.openImagePlus(options)[channelDAPI];                
                 // Find DAPI nuclei
                 Objects3DIntPopulation dapiPop = new Objects3DIntPopulation();
                 dapiPop = utils.cellposeDetection(imgDAPI, "cyto", 1, 80, 0.5, false, utils.minNucleusVol, utils.maxNucleusVol);
@@ -131,55 +131,32 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
                 
                 // Open Th channel
                 utils.print("- Analyzing " + channelsName.get(1) + " channel -");
-                channelIndex = channels.indexOf(channelsOrdered.get(1));
-                ImagePlus imgTh = BF.openImagePlus(options)[channelIndex];
+                int channelTh = channels.indexOf(channelsOrdered.get(1));
+                ImagePlus imgTh = BF.openImagePlus(options)[channelTh];
                 // Find Th cells
                 Objects3DIntPopulation thPop = new Objects3DIntPopulation();
                 thPop = utils.cellposeDetection(imgTh, "cyto2", 1, 100, 0.5, true, utils.minCellVol, utils.maxCellVol);
                 System.out.println(thPop.getNbObjects() + " " + channelsName.get(1) + " cells found");
                         
-                // Colocalization th dapi
+                // Colocalization
                 utils.print("- Performing colocalization between " + channelsName.get(0) + " nuclei and " + channelsName.get(1) + " cells -");
-                ArrayList<Cell> colocDapiThPop = utils.colocalization(thPop, dapiPop);
-                System.out.println(colocDapiThPop.size() + " " + channelsName.get(1) + " cells colocalized with " + channelsName.get(0) + " nuclei");
-                utils.resetLabels(colocDapiThPop);
-                
-                // Open Neun channel if exist
-                Objects3DIntPopulation neunPop = new Objects3DIntPopulation();
-                ArrayList<Cell> colocNeunThPop = new ArrayList();
-                ImagePlus imgNeun = null;
-                if (channelsName.size() == 4) {
-                    utils.print("- Analyzing " + channelsName.get(3) + " channel -");
-                    channelIndex = channels.indexOf(channelsOrdered.get(3));
-                    imgNeun = BF.openImagePlus(options)[channelIndex];
-                    // Find Neun cells
-                    neunPop = utils.cellposeDetection(imgNeun, "cyto2", 1, 100, 0.5, true, utils.minCellVol, utils.maxCellVol);
-                    System.out.println(thPop.getNbObjects() + " " + channelsName.get(3) + " cells found");
-                    // Colocalization th neun
-                    utils.print("- Performing colocalization between " + channelsName.get(3) + " cells and " + channelsName.get(1) + " cells -");
-                    colocNeunThPop = utils.colocalization(neunPop, thPop);
-                    System.out.println(colocNeunThPop.size() + " " + channelsName.get(3) + " cells colocalized with " + channelsName.get(1) + " cells");
-                    utils.resetLabels(colocNeunThPop);
-                    utils.flush_close(imgNeun);
-                }
+                ArrayList<Cell> colocPop = utils.colocalization(thPop, dapiPop);
+                System.out.println(colocPop.size() + " " + channelsName.get(1) + " cells colocalized with " + channelsName.get(0) + " nuclei");
+                utils.resetLabels(colocPop);
                 
                 //  Open ORF1p channel
                 utils.print("- Measuring intensities in " + channelsName.get(2) + " channel -");
-                channelIndex = channels.indexOf(channelsOrdered.get(2));
-                ImagePlus imgORF1p = BF.openImagePlus(options)[channelIndex];    
-                utils.fillCellPopParameters(colocDapiThPop, imgORF1p);
-                
-                if (channelsName.size() == 4)
-                    utils.fillCellPopParameters(colocNeunThPop, imgORF1p);
+                int channelORF1p = channels.indexOf(channelsOrdered.get(2));
+                ImagePlus imgORF1p = BF.openImagePlus(options)[channelORF1p];    
+                utils.fillCellPopParameters(colocPop, imgORF1p);
                                
                 // Save image objects
                 utils.print("- Saving results -");
                 utils.drawNuclei(dapiPop, imgDAPI, rootName, outDirResults);
-                utils.drawResults(colocDapiThPop, imgTh, rootName, outDirResults);
-                utils.drawResults(colocNeunThPop, imgNeun, rootName, outDirResults);
+                utils.drawResults(colocPop, imgTh, rootName, outDirResults);
             
                 // Write detailed results
-                for(Cell cell: colocDapiThPop) {
+                for(Cell cell: colocPop) {
                     cellsResults.write(rootName+"\t"+cell.cell.getLabel()+"\t"+cell.parameters.get("cellVol")+"\t"+cell.parameters.get("cellInt")+
                             "\t"+cell.parameters.get("nucleusVol")+"\t"+cell.parameters.get("nucleusInt")+
                             "\t"+cell.parameters.get("cytoplasmVol")+"\t"+cell.parameters.get("cytoplasmInt")+"\n");
@@ -189,18 +166,15 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
                 // Write global results
                 double[] nucleiParams = utils.getNucleiParams(dapiPop, imgORF1p);
                 double imgVol = imgTh.getWidth() * imgTh.getHeight() * imgTh.getNSlices() * utils.pixelVol;
-                globalResults.write(rootName+"\t"+imgVol+"\t"+colocDapiThPop.size()+"\t"+utils.findPopMeanParam(colocDapiThPop, "Vol", "cell")+"\t"+
-                        utils.findPopMeanParam(colocDapiThPop, "Int", "cell")+"\t"+utils.findPopMeanParam(colocDapiThPop, "Vol", "nucleus")+"\t"+
-                        utils.findPopMeanParam(colocDapiThPop, "Int", "nucleus")+"\t"+utils.findPopMeanParam(colocDapiThPop, "Vol", "cytoplasm")+"\t"+
-                        utils.findPopMeanParam(colocDapiThPop, "Int", "cytoplasm")+"\t"+((int) nucleiParams[0])+"\t"+nucleiParams[1]+"\n");
+                globalResults.write(rootName+"\t"+imgVol+"\t"+colocPop.size()+"\t"+utils.findPopMeanParam(colocPop, "Vol", "cell")+"\t"+
+                        utils.findPopMeanParam(colocPop, "Int", "cell")+"\t"+utils.findPopMeanParam(colocPop, "Vol", "nucleus")+"\t"+
+                        utils.findPopMeanParam(colocPop, "Int", "nucleus")+"\t"+utils.findPopMeanParam(colocPop, "Vol", "cytoplasm")+"\t"+
+                        utils.findPopMeanParam(colocPop, "Int", "cytoplasm")+"\t"+((int) nucleiParams[0])+"\t"+nucleiParams[1]+"\n");
                 globalResults.flush();
                 
                 utils.flush_close(imgDAPI);
                 utils.flush_close(imgTh);
                 utils.flush_close(imgORF1p);
-                if (imgNeun != null)
-                    utils.flush_close(imgNeun);
-               
             }
             
             cellsResults.close();

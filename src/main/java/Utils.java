@@ -149,10 +149,8 @@ public class Utils {
       * @throws java.io.IOException
       */
     public ArrayList<String> findChannels(String imageName, IMetadata meta, ImageProcessorReader reader, ArrayList<String> channelsName) throws DependencyException, ServiceException, FormatException, IOException {
-        int nbChannels = reader.getSizeC();
-        if (nbChannels == 4)
-            channelsName.add("Neun");
         this.channelsName = channelsName;
+        int nbChannels = reader.getSizeC();
         ArrayList<String> channels = new ArrayList<String>();
         String imageExtension =  FilenameUtils.getExtension(imageName);
         switch (imageExtension) {
@@ -213,7 +211,7 @@ public class Utils {
         gd.addMessage("CellPose", Font.getFont("Monospace"), Color.blue);
         String tempEnv = "/opt/miniconda3/envs/cellpose";
         if (IJ.isWindows()) {
-            tempEnv = System.getProperty("user.home")+File.separator+"miniconda3"+File.separator+"envs"+File.separator+"CellPose";
+            tempEnv = System.getProperty("user.home")+"miniconda3"+File.separator+"envs"+File.separator+"CellPose";
         }
         gd.addDirectoryField​("Env directory", tempEnv);
         
