@@ -2,30 +2,33 @@
 
 * **Developed for:** Olivia
 * **Team:** Prochiantz
-* **Date:** December 2022
+* **Date:** September 2022
 * **Software:** Fiji
 
 
 ### Images description
 
-3D images taken with a x60 objective
+3D images taken with a x20 objective
 
 3 channels:
-  1. *CFP:* foci
-  2. *phiYFP:* foci
-  3. *TL phase:* bacteria
+  1. *CSU_405:* DAPI nuclei
+  2. *CSU_488:* Th cells 
+  3. *CSU_561:* ORF1p
 
 ### Plugin description
 
-* Detect bacteria on the average intensity Z-projection of channel 3 with Omnipose
-* Detect foci on the max intensity Z-projection of channels 1 and 2 with DoG + Otsu threshold
-* In each bacterium, return distances between channel 1 and channel 2 foci and colocalization events
+* Detect DAPI nuclei with Cellpose
+* Detect Th cells with Cellpose
+* Keep Th cells colocalizing with a nucleus only
+* Measure ORF1p intensity in the nucleus and the cytoplasm of each Th cell
+* Measure ORF1p intensity in Th-negative nuclei
 
 
 ### Dependencies
 
 * **3DImageSuite** Fiji plugin
-* **CLIJ** Fiji plugin
-* **Omnipose** conda environment + *bact_phase_omnitorch_0* model
+* **Cellpose** conda environment + *cyto* and *cyto2* models
 
 ### Version history
+
+Version 1 released on September 22, 2022.
