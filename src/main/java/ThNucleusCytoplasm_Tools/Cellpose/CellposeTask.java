@@ -1,6 +1,6 @@
-package Cellpose;
+package ThNucleusCytoplasm_Tools.Cellpose;
 
-import Cellpose.CellposeTaskSettings;
+import ThNucleusCytoplasm_Tools.Cellpose.CellposeTaskSettings;
 import java.util.ArrayList;
 
 public class CellposeTask {

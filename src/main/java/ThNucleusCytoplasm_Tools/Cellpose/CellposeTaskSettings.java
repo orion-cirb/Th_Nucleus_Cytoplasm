@@ -1,4 +1,4 @@
-package Cellpose;
+package ThNucleusCytoplasm_Tools.Cellpose;
 
 
 public class CellposeTaskSettings {

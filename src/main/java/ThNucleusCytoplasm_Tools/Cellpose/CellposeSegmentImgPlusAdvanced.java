@@ -1,7 +1,7 @@
-package Cellpose;
+package ThNucleusCytoplasm_Tools.Cellpose;
 
-import Cellpose.CellposeTaskSettings;
-import Cellpose.CellposeTask;
+import ThNucleusCytoplasm_Tools.Cellpose.CellposeTaskSettings;
+import ThNucleusCytoplasm_Tools.Cellpose.CellposeTask;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.ImageStack;

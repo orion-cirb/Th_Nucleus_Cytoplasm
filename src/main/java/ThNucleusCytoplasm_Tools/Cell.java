@@ -1,3 +1,5 @@
+package ThNucleusCytoplasm_Tools;
+
 import java.util.HashMap;
 import mcib3d.image3d.ImageHandler;
 import mcib3d.geom2.Object3DInt;
@@ -11,12 +13,14 @@ public class Cell {
     public Object3DInt cell;
     public Object3DInt nucleus;
     public Object3DInt cytoplasm;
+    public boolean thPositive;
     public HashMap<String, Double> parameters;
     
     public Cell(Object3DInt cell, Object3DInt nucleus, Object3DInt cytoplasm) {
         this.cell = cell;
         this.nucleus = nucleus;
         this.cytoplasm = cytoplasm;
+        this.thPositive = false;
         this.parameters = new HashMap<>();
     }
     
