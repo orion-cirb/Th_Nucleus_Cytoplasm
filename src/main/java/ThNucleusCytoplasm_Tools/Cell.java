@@ -13,14 +13,14 @@ public class Cell {
     public Object3DInt cell;
     public Object3DInt nucleus;
     public Object3DInt cytoplasm;
-    public boolean thPositive;
+    public boolean NeuNPositive;
     public HashMap<String, Double> parameters;
     
     public Cell(Object3DInt cell, Object3DInt nucleus, Object3DInt cytoplasm) {
         this.cell = cell;
         this.nucleus = nucleus;
         this.cytoplasm = cytoplasm;
-        this.thPositive = false;
+        this.NeuNPositive = false;
         this.parameters = new HashMap<>();
     }
     

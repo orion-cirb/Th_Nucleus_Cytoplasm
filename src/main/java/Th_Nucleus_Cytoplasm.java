@@ -76,7 +76,7 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
             }
             
             // Write headers in results files
-            String header = "Image name\tCell ID\tTH-positive\tCell volume (µm3)\tCell mean ORF1p intensity\tNucleus volume (µm3)\tNucleus mean ORF1p intensity"
+            String header = "Image name\tCell ID\tNeuN-positive\tCell volume (µm3)\tCell mean ORF1p intensity\tNucleus volume (µm3)\tNucleus mean ORF1p intensity"
                     + "\tCytoplasm volume (µm3)\tCytoplasm mean ORF1p intensity\n";
             FileWriter fwCells = new FileWriter(outDirResults + "detailedResults.xls", false);
             cellsResults = new BufferedWriter(fwCells);
@@ -84,7 +84,7 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
             cellsResults.flush();
             header = "Image name\tVolume (µm3)\tNb cells\tNb TH-positive cells\tCells mean volume (µm3)\tCells mean ORF1p intensity\tNuclei mean volume (µm3)"
                     + "\tNuclei mean ORF1p intensity\tCytoplasms mean volume (µm3)\tCytoplasm mean ORF1p intensity"
-                    + "\tNb NeuN-negative nuclei\tNeuN-negative nuclei mean ORF1p intensity\n";
+                    + "\tNb TH-negative nuclei\tTH-negative nuclei mean ORF1p intensity\n";
             FileWriter fwGlobal = new FileWriter(outDirResults + "globalResults.xls", false);
             globalResults = new BufferedWriter(fwGlobal);
             globalResults.write(header);
@@ -134,6 +134,22 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
                 dapiPop = tools.cellposeDetection(imgDAPI, tools.cellposeNucleusModel, tools.cellposeNucleusDiam, 0.5, true, tools.minNucleusVol, tools.maxNucleusVol);
                 System.out.println(dapiPop.getNbObjects() + " DAPI nuclei found");
                 
+                
+                 // Open Th channel
+                tools.print("- Analyzing TH channel -");
+                System.setOut(new NullPrintStream());
+                ImagePlus imgTh = BF.openImagePlus(options)[channels.indexOf(channelsOrdered.get(1))];
+                System.setOut(console);
+                // Find Th cells
+                Objects3DIntPopulation thPop = new Objects3DIntPopulation();
+                thPop = tools.cellposeDetection(imgTh, "cyto2", tools.cellposeCellDiam, 0.5, false, tools.minCellVol, tools.maxCellVol);
+                System.out.println(thPop.getNbObjects() + " TH cells found");
+                
+                // Colocalization between DAPI nuclei and Th cells
+                tools.print("- Performing colocalization between DAPI nuclei and Th cells -");
+                ArrayList<Cell> colocDapiThPop = tools.colocalization(thPop, dapiPop);
+                System.out.println(colocDapiThPop.size() + " TH cells colocalized with DAPI nuclei");
+               
                 // Open NeuN channel
                 tools.print("- Analyzing NeuN channel -");
                 System.setOut(new NullPrintStream());
@@ -144,41 +160,26 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
                 neunPop = tools.cellposeDetection(imgNeuN, "cyto2", tools.cellposeCellDiam, 0.5, true, tools.minCellVol, tools.maxCellVol);
                 System.out.println(neunPop.getNbObjects() + " NeuN cells found");
                 
-                // Colocalization between DAPI nuclei and NeuN cells
-                tools.print("- Performing colocalization between DAPI nuclei and NeuN cells -");
-                ArrayList<Cell> colocDapiNeuNPop = tools.colocalization(neunPop, dapiPop);
-                System.out.println(colocDapiNeuNPop.size() + " NeuN cells colocalized with DAPI nuclei");
-               
-                // Open Th channel
-                tools.print("- Analyzing TH channel -");
-                System.setOut(new NullPrintStream());
-                ImagePlus imgTh = BF.openImagePlus(options)[channels.indexOf(channelsOrdered.get(1))];
-                System.setOut(console);
-                // Find Th cells
-                Objects3DIntPopulation thPop = new Objects3DIntPopulation();
-                thPop = tools.cellposeDetection(imgTh, "cyto2", tools.cellposeCellDiam, 0.5, false, tools.minCellVol, tools.maxCellVol);
-                System.out.println(thPop.getNbObjects() + " TH cells found");
-                
-                // Colocalization between NeuN and TH cells
-                tools.print("- Determine which NeuN cells are TH-positives -");
-                int nbThPositiveCells = tools.thPositivity(colocDapiNeuNPop, thPop);
-                System.out.println(nbThPositiveCells + " NeuN cells are TH-positives");
+                // Colocalization between TH and NeuN cells
+                tools.print("- Determine which TH cells are NeuN-positives -");
+                int nbNeuNPositiveCells = tools.NeuNPositivity(colocDapiThPop, neunPop);
+                System.out.println(nbNeuNPositiveCells + " TH cells are NeuN-positives");
                                         
                 //  Open ORF1p channel
                 tools.print("- Measuring intensities in ORF1p channel -");
                 System.setOut(new NullPrintStream());
                 ImagePlus imgORF1p = BF.openImagePlus(options)[channels.indexOf(channelsOrdered.get(2))];   
                 System.setOut(console);
-                tools.fillCellPopParameters(colocDapiNeuNPop, imgORF1p);
+                tools.fillCellPopParameters(colocDapiThPop, imgORF1p);
                                
                 // Save image objects
                 tools.print("- Saving results -");
                 tools.drawNuclei(dapiPop, imgDAPI, rootName, outDirResults);
-                tools.drawResults(colocDapiNeuNPop, imgTh, rootName, outDirResults);
+                tools.drawResults(colocDapiThPop, imgTh, rootName, outDirResults);
             
                 // Write detailed results
-                for(Cell cell: colocDapiNeuNPop) {
-                    cellsResults.write(rootName+"\t"+cell.cell.getLabel()+"\t"+cell.thPositive+"\t"+cell.parameters.get("cellVol")+"\t"+cell.parameters.get("cellInt")+
+                for(Cell cell: colocDapiThPop) {
+                    cellsResults.write(rootName+"\t"+cell.cell.getLabel()+"\t"+cell.NeuNPositive+"\t"+cell.parameters.get("cellVol")+"\t"+cell.parameters.get("cellInt")+
                             "\t"+cell.parameters.get("nucleusVol")+"\t"+cell.parameters.get("nucleusInt")+
                             "\t"+cell.parameters.get("cytoplasmVol")+"\t"+cell.parameters.get("cytoplasmInt")+"\n");
                     cellsResults.flush();
@@ -187,10 +188,10 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
                 // Write global results
                 double[] nucleiParams = tools.getNucleiParams(dapiPop, imgORF1p);
                 double imgVol = imgTh.getWidth() * imgTh.getHeight() * imgTh.getNSlices() * tools.pixelVol;
-                globalResults.write(rootName+"\t"+imgVol+"\t"+colocDapiNeuNPop.size()+"\t"+nbThPositiveCells+"\t"+tools.findPopMeanParam(colocDapiNeuNPop, "Vol", "cell")+"\t"+
-                        tools.findPopMeanParam(colocDapiNeuNPop, "Int", "cell")+"\t"+tools.findPopMeanParam(colocDapiNeuNPop, "Vol", "nucleus")+"\t"+
-                        tools.findPopMeanParam(colocDapiNeuNPop, "Int", "nucleus")+"\t"+tools.findPopMeanParam(colocDapiNeuNPop, "Vol", "cytoplasm")+"\t"+
-                        tools.findPopMeanParam(colocDapiNeuNPop, "Int", "cytoplasm")+"\t"+((int) nucleiParams[0])+"\t"+nucleiParams[1]+"\n");
+                globalResults.write(rootName+"\t"+imgVol+"\t"+colocDapiThPop.size()+"\t"+nbNeuNPositiveCells+"\t"+tools.findPopMeanParam(colocDapiThPop, "Vol", "cell")+"\t"+
+                        tools.findPopMeanParam(colocDapiThPop, "Int", "cell")+"\t"+tools.findPopMeanParam(colocDapiThPop, "Vol", "nucleus")+"\t"+
+                        tools.findPopMeanParam(colocDapiThPop, "Int", "nucleus")+"\t"+tools.findPopMeanParam(colocDapiThPop, "Vol", "cytoplasm")+"\t"+
+                        tools.findPopMeanParam(colocDapiThPop, "Int", "cytoplasm")+"\t"+((int) nucleiParams[0])+"\t"+nucleiParams[1]+"\n");
                 globalResults.flush();
                 
                 tools.flush_close(imgDAPI);

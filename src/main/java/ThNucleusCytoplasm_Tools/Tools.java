@@ -348,7 +348,7 @@ public class Tools {
                     if (colocVal > 0.25*nucleus.size()) {
                         Object3DComputation objComputation = new Object3DComputation​(cell);
                         Object3DInt cytoplasm = objComputation.getObjectSubtracted(nucleus);
-                        nucleus.setComment("NeuN positive");
+                        nucleus.setComment("TH positive");
                         colocPop.add(new Cell(cell, nucleus, cytoplasm));
                         break;
                     }
@@ -361,27 +361,28 @@ public class Tools {
     
     
     /*
-     * Determine if cells are TH-positives
+     * Determine if cells are NeuN-positives
      */
-    public int thPositivity(ArrayList<Cell> cells, Objects3DIntPopulation thPop) {
+    public int NeuNPositivity(ArrayList<Cell> cells, Objects3DIntPopulation thPop) {
         Objects3DIntPopulation cellsPop = new Objects3DIntPopulation();
-        for(Cell cell: cells) cellsPop.addObject(cell.cell);
+        for(Cell cell: cells) 
+            cellsPop.addObject(cell.cell);
         
-        int nbThCells = 0;
+        int nbNeuNCells = 0;
         if (cellsPop.getNbObjects() > 0 && thPop.getNbObjects() > 0) {
             MeasurePopulationColocalisation coloc = new MeasurePopulationColocalisation(cellsPop, thPop);
             for (Cell cell: cells) {
                 for (Object3DInt th: thPop.getObjects3DInt()) {
                     double colocVal = coloc.getValueObjectsPair(cell.cell, th);
                     if (colocVal > 0.25*th.size()) {
-                        cell.thPositive = true;
-                        nbThCells++;
+                        cell.NeuNPositive = true;
+                        nbNeuNCells++;
                         break;
                     }
                 }
             }
         }
-        return(nbThCells);
+        return(nbNeuNCells);
     }
     
     /*
@@ -426,7 +427,7 @@ public class Tools {
         double sum = 0;
         ImageHandler imh = ImageHandler.wrap(img);
         for(Object3DInt obj: pop.getObjects3DInt()) {
-            if (obj.getComment() != ("NeuN positive")) {
+            if (obj.getComment() != ("TH positive")) {
                 nb++;
                 sum += new MeasureIntensity(obj, imh).getValueMeasurement(MeasureIntensity.INTENSITY_AVG);
             }
@@ -474,7 +475,7 @@ public class Tools {
                 cell.nucleus.drawObject(imgObj1);
                 cell.nucleus.drawObject(imgObj4, 255);
                 
-                if(cell.thPositive) {
+                if(cell.NeuNPositive) {
                     cell.cytoplasm.drawObject(imgObj2);
                     cell.cytoplasm.drawObject(imgObj5, 255);
                 } else {
