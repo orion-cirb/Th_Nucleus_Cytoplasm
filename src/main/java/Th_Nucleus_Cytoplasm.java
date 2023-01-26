@@ -171,7 +171,7 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
             
                 // Write detailed results
                 for(Cell cell: colocPop) {
-                    cellsResults.write(rootName+"\t"+cell.cell.getLabel()+"\t"+cell.NeuNPositive+"\t"+cell.THPositive+"\t"+cell.parameters.get("cellVol")+"\t"+cell.parameters.get("cellInt")+
+                    cellsResults.write(rootName+"\t"+cell.nucleus.getLabel()+"\t"+cell.NeuNPositive+"\t"+cell.THPositive+"\t"+cell.parameters.get("cellVol")+"\t"+cell.parameters.get("cellInt")+
                             "\t"+cell.parameters.get("nucleusVol")+"\t"+cell.parameters.get("nucleusInt")+
                             "\t"+cell.parameters.get("cytoplasmVol")+"\t"+cell.parameters.get("cytoplasmInt")+"\n");
                     cellsResults.flush();

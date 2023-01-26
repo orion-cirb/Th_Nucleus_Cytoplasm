@@ -345,8 +345,8 @@ public class Tools {
             MeasurePopulationColocalisation colocTh = new MeasurePopulationColocalisation(nucleiPop, thPop);
             MeasurePopulationColocalisation colocNeuN = new MeasurePopulationColocalisation(nucleiPop, neunPop);
             for (Object3DInt nucleus: nucleiPop.getObjects3DInt()) {
-                Object3DInt cell = new Object3DInt();
-                Object3DInt cyto = new Object3DInt();
+                Object3DInt cell = null;
+                Object3DInt cyto = null;
                 boolean thPos = false, neunPos = false; 
                 for (Object3DInt neun: neunPop.getObjects3DInt()) {
                     double colocVal = colocNeuN.getValueObjectsPair(nucleus, neun);
@@ -382,9 +382,11 @@ public class Tools {
     public void resetLabels(ArrayList<Cell> cellPop) {
         float label = 1;
         for (Cell cell: cellPop) {
-            cell.cell.setLabel(label);
+            if (cell.cell != null) 
+                cell.cell.setLabel(label);
             cell.nucleus.setLabel(label);
-            cell.cytoplasm.setLabel(label);
+            if (cell.cytoplasm != null)
+                cell.cytoplasm.setLabel(label);
             label++;
         }
     }
@@ -472,39 +474,35 @@ public class Tools {
         ImageHandler imgObj2 = imgObj1.createSameDimensions();
         ImageHandler imgObj3 = imgObj1.createSameDimensions();
         ImageHandler imgObj4 = imgObj1.createSameDimensions();
-        ImageHandler imgObj5 = imgObj1.createSameDimensions();
-        ImageHandler imgObj6 = imgObj1.createSameDimensions();
+      
         if (pop.size() > 0) {
             for (Cell cell: pop) {
                 cell.nucleus.drawObject(imgObj1);
-                cell.nucleus.drawObject(imgObj4, 255);
+                cell.nucleus.drawObject(imgObj2, 255);
                 
-                if(cell.NeuNPositive) {
-                    cell.cytoplasm.drawObject(imgObj2);
-                    cell.cytoplasm.drawObject(imgObj5, 255);
-                } else {
+                if (cell.cytoplasm != null) {
                     cell.cytoplasm.drawObject(imgObj3);
-                    cell.cytoplasm.drawObject(imgObj6, 255);
-                }
-            } 
+                    cell.cytoplasm.drawObject(imgObj4, 255);
+                } 
+            }
         }
        
-        ImagePlus[] imgColors1 = {imgObj3.getImagePlus(), imgObj2.getImagePlus(), imgObj1.getImagePlus()};
+        ImagePlus[] imgColors1 = {null, imgObj4.getImagePlus(), imgObj2.getImagePlus()};
         ImagePlus imgObjects1 = new RGBStackMerge().mergeHyperstacks(imgColors1, false);
         imgObjects1.setCalibration(img.getCalibration());
         FileSaver ImgObjectsFile1 = new FileSaver(imgObjects1);
         ImgObjectsFile1.saveAsTiff(outDir + imgName + "_labels.tif"); 
-        imgObj1.closeImagePlus();
         imgObj2.closeImagePlus();
+        imgObj4.closeImagePlus();
         flush_close(imgObjects1);
         
-        ImagePlus[] imgColors2 = {imgObj6.getImagePlus(), imgObj5.getImagePlus(), imgObj4.getImagePlus(), img};
+        ImagePlus[] imgColors2 = {null, imgObj3.getImagePlus(), imgObj1.getImagePlus(), img};
         ImagePlus imgObjects2 = new RGBStackMerge().mergeHyperstacks(imgColors2, false);
         imgObjects2.setCalibration(img.getCalibration());
         FileSaver ImgObjectsFile2 = new FileSaver(imgObjects2);
         ImgObjectsFile2.saveAsTiff(outDir + imgName + "_cells.tif"); 
+        imgObj1.closeImagePlus();
         imgObj3.closeImagePlus();
-        imgObj4.closeImagePlus();
         flush_close(imgObjects2);
     }
     
