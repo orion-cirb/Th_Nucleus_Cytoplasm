@@ -29,6 +29,7 @@ import mcib3d.geom2.Objects3DIntPopulationComputation;
 import mcib3d.geom2.measurements.MeasureIntensity;
 import mcib3d.geom2.measurementsPopulation.MeasurePopulationColocalisation;
 import mcib3d.image3d.ImageHandler;
+import org.apache.commons.lang.BooleanUtils;
 
 
 
@@ -338,55 +339,42 @@ public class Tools {
     /*
      * Find cells colocalizing with a nucleus
      */
-    public ArrayList<Cell> colocalization(Objects3DIntPopulation cellsPop, Objects3DIntPopulation nucleiPop) {
+    public ArrayList<Cell> colocalization(Objects3DIntPopulation thPop, Objects3DIntPopulation neunPop, Objects3DIntPopulation nucleiPop) {
         ArrayList<Cell> colocPop = new ArrayList<Cell>();
-        if (cellsPop.getNbObjects() > 0 && nucleiPop.getNbObjects() > 0) {
-            MeasurePopulationColocalisation coloc = new MeasurePopulationColocalisation(nucleiPop, cellsPop);
-            for (Object3DInt cell: cellsPop.getObjects3DInt()) {
-                for (Object3DInt nucleus: nucleiPop.getObjects3DInt()) {
-                    double colocVal = coloc.getValueObjectsPair(nucleus, cell);
+        if (nucleiPop.getNbObjects() > 0 ) {
+            MeasurePopulationColocalisation colocTh = new MeasurePopulationColocalisation(nucleiPop, thPop);
+            MeasurePopulationColocalisation colocNeuN = new MeasurePopulationColocalisation(nucleiPop, neunPop);
+            for (Object3DInt nucleus: nucleiPop.getObjects3DInt()) {
+                Object3DInt cell = new Object3DInt();
+                Object3DInt cyto = new Object3DInt();
+                boolean thPos = false, neunPos = false; 
+                for (Object3DInt neun: neunPop.getObjects3DInt()) {
+                    double colocVal = colocNeuN.getValueObjectsPair(nucleus, neun);
                     if (colocVal > 0.25*nucleus.size()) {
-                        Object3DComputation objComputation = new Object3DComputation​(cell);
-                        Object3DInt cytoplasm = objComputation.getObjectSubtracted(nucleus);
-                        nucleus.setComment("TH positive");
-                        colocPop.add(new Cell(cell, nucleus, cytoplasm));
+                        cell = neun;
+                        neunPos = true;
                         break;
                     }
                 }
+                for (Object3DInt th: thPop.getObjects3DInt()) {
+                    double colocVal = colocTh.getValueObjectsPair(nucleus, th);
+                    if (colocVal > 0.25*nucleus.size()) {
+                        cell = th;
+                        thPos = true;
+                        break;
+                    }
+                }
+                if (cell != null) {
+                    Object3DComputation objComputation = new Object3DComputation(cell);
+                    cyto = objComputation.getObjectSubtracted(nucleus);
+                }
+                colocPop.add(new Cell(cell, nucleus, cyto, thPos, neunPos));
             }
         }
         resetLabels(colocPop);
         return(colocPop);
     }
     
-    
-    /*
-     * Determine if cells are NeuN-positives
-     */
-    public int NeuNPositivity(ArrayList<Cell> cells, Objects3DIntPopulation pop, String type) {
-        Objects3DIntPopulation cellsPop = new Objects3DIntPopulation();
-        for(Cell cell: cells) 
-            cellsPop.addObject(cell.cell);
-        
-        int nbNeuNCells = 0;
-        if (cellsPop.getNbObjects() > 0 && pop.getNbObjects() > 0) {
-            MeasurePopulationColocalisation coloc = new MeasurePopulationColocalisation(cellsPop, pop);
-            for (Cell cell: cells) {
-                for (Object3DInt obj: pop.getObjects3DInt()) {
-                    double colocVal = coloc.getValueObjectsPair(cell.cell, obj);
-                    if (colocVal > 0.25*obj.size()) {
-                        if (type.equals("th"))
-                            cell.NeuNPositive = true;
-                        else
-                            cell.THPositive = true;
-                        nbNeuNCells++;
-                        break;
-                    }
-                }
-            }
-        }
-        return(nbNeuNCells);
-    }
     
     /*
      * Reset labels of cells in population
@@ -410,6 +398,19 @@ public class Tools {
             cell.fillVolumes(pixelVol);
             cell.fillIntensities(imh);
         }
+    }
+    /**
+     * 
+     */
+    public int[] countCells(ArrayList<Cell> colocPop) {
+        int nbThNeun = 0, nbTh = 0, nbNeun = 0, nbNone = 0;
+        for (Cell cell: colocPop) {
+            nbThNeun += BooleanUtils.toInteger(cell.THPositive && cell.NeuNPositive);
+            nbTh += BooleanUtils.toInteger(cell.THPositive && !cell.NeuNPositive);
+            nbNeun += BooleanUtils.toInteger(!cell.THPositive && cell.NeuNPositive);
+            nbNone+= BooleanUtils.toInteger(!cell.THPositive && !cell.NeuNPositive);
+        }
+        return(new int[]{nbThNeun, nbTh, nbNeun, nbNone});
     }
     
     
