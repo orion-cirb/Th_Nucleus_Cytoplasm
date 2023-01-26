@@ -82,9 +82,7 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
             cellsResults = new BufferedWriter(fwCells);
             cellsResults.write(header);
             cellsResults.flush();
-            header = "Image name\tVolume (µm3)\tNb cells\tNb TH+/NeuN+ cells\tNb TH+/NeuN- cells\tNb TH-/NeuN+ cells\tNb TH-/NeuN- cells\tCells mean volume (µm3)"
-                    + "\tCells mean ORF1p intensity\tNuclei mean volume (µm3)\tNuclei mean ORF1p intensity\tCytoplasms mean volume (µm3)"
-                    + "\tCytoplasm mean ORF1p intensity\n";
+            header = "Image name\tVolume (µm3)\tNb cells\tNb TH+/NeuN+ cells\tNb TH+/NeuN- cells\tNb TH-/NeuN+ cells\tNb TH-/NeuN- cells\n";
             FileWriter fwGlobal = new FileWriter(outDirResults + "globalResults.xls", false);
             globalResults = new BufferedWriter(fwGlobal);
             globalResults.write(header);
@@ -166,25 +164,20 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
                                
                 // Save image objects
                 tools.print("- Saving results -");
-                tools.drawNuclei(dapiPop, imgDAPI, rootName, outDirResults);
                 tools.drawResults(colocPop, imgTh, rootName, outDirResults);
             
                 // Write detailed results
                 for(Cell cell: colocPop) {
-                    cellsResults.write(rootName+"\t"+cell.nucleus.getLabel()+"\t"+cell.NeuNPositive+"\t"+cell.THPositive+"\t"+cell.parameters.get("cellVol")+"\t"+cell.parameters.get("cellInt")+
-                            "\t"+cell.parameters.get("nucleusVol")+"\t"+cell.parameters.get("nucleusInt")+
+                    cellsResults.write(rootName+"\t"+cell.nucleus.getLabel()+"\t"+cell.NeuNPositive+"\t"+cell.THPositive+"\t"+cell.parameters.get("cellVol")+
+                            "\t"+cell.parameters.get("cellInt")+"\t"+cell.parameters.get("nucleusVol")+"\t"+cell.parameters.get("nucleusInt")+
                             "\t"+cell.parameters.get("cytoplasmVol")+"\t"+cell.parameters.get("cytoplasmInt")+"\n");
                     cellsResults.flush();
                 }
                 
                 // Write global results
-                double[] nucleiParams = tools.getNucleiParams(dapiPop, imgORF1p);
                 double imgVol = imgTh.getWidth() * imgTh.getHeight() * imgTh.getNSlices() * tools.pixelVol;
                 int[] nbCells = tools.countCells(colocPop);
-                globalResults.write(rootName+"\t"+imgVol+"\t"+colocPop.size()+"\t"+nbCells[0]+"\t"+nbCells[1]+"\t"+nbCells[2]+"\t"+nbCells[3]+"\t"+
-                        tools.findPopMeanParam(colocPop, "Vol", "cell")+"\t"+tools.findPopMeanParam(colocPop, "Int", "cell")+"\t"+
-                        tools.findPopMeanParam(colocPop, "Vol", "nucleus")+"\t"+tools.findPopMeanParam(colocPop, "Int", "nucleus")+"\t"+
-                        tools.findPopMeanParam(colocPop, "Vol", "cytoplasm")+"\t"+tools.findPopMeanParam(colocPop, "Int", "cytoplasm")+"\n");
+                globalResults.write(rootName+"\t"+imgVol+"\t"+colocPop.size()+"\t"+nbCells[0]+"\t"+nbCells[1]+"\t"+nbCells[2]+"\t"+nbCells[3]+"\n");
                 globalResults.flush();
                 
                 tools.flush_close(imgDAPI);

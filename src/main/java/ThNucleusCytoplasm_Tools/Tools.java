@@ -350,7 +350,7 @@ public class Tools {
                 boolean thPos = false, neunPos = false; 
                 for (Object3DInt neun: neunPop.getObjects3DInt()) {
                     double colocVal = colocNeuN.getValueObjectsPair(nucleus, neun);
-                    if (colocVal > 0.25*nucleus.size()) {
+                    if (colocVal > 0.5*nucleus.size()) {
                         cell = neun;
                         neunPos = true;
                         break;
@@ -415,56 +415,6 @@ public class Tools {
         return(new int[]{nbThNeun, nbTh, nbNeun, nbNone});
     }
     
-    
-    /*
-     * Find mean volume or intensity of a population of objects
-     */
-    public double findPopMeanParam(ArrayList<Cell> pop, String parameter, String object) {
-        double sum = 0;
-        for(Cell cell: pop) {
-            sum += cell.parameters.get(object+parameter);
-        }
-        return(sum / pop.size());
-    }
-          
-
-    public double[] getNucleiParams(Objects3DIntPopulation pop, ImagePlus img) {
-        double nb = 0;
-        double sum = 0;
-        ImageHandler imh = ImageHandler.wrap(img);
-        for(Object3DInt obj: pop.getObjects3DInt()) {
-            if (obj.getComment() != ("TH positive")) {
-                nb++;
-                sum += new MeasureIntensity(obj, imh).getValueMeasurement(MeasureIntensity.INTENSITY_AVG);
-            }
-        }
-        return new double[]{nb, sum / nb};
-    }
-    
-    
-    public void drawNuclei(Objects3DIntPopulation pop, ImagePlus img, String imgName, String outDir) {
-        ImageHandler imgObj1 = ImageHandler.wrap(img).createSameDimensions();
-        ImageHandler imgObj2 = imgObj1.createSameDimensions();
-        if (pop.getNbObjects() > 0) {
-            for (Object3DInt obj: pop.getObjects3DInt()) {
-                if (obj.getComment() == "NeuN positive") {
-                    obj.drawObject(imgObj1, 255);
-                } else {
-                    obj.drawObject(imgObj2, 255);
-                }
-            } 
-        }
-       
-        ImagePlus[] imgColors = {null, null, imgObj1.getImagePlus(), img, imgObj2.getImagePlus()};
-        ImagePlus imgObjects = new RGBStackMerge().mergeHyperstacks(imgColors, false);
-        imgObjects.setCalibration(img.getCalibration());
-        FileSaver ImgObjectsFile = new FileSaver(imgObjects);
-        ImgObjectsFile.saveAsTiff(outDir + imgName + "_nuclei.tif"); 
-        imgObj1.closeImagePlus();
-        imgObj2.closeImagePlus();
-        flush_close(imgObjects);
-    }
-    
          
     /*
      * Save population of cells in image
@@ -474,35 +424,45 @@ public class Tools {
         ImageHandler imgObj2 = imgObj1.createSameDimensions();
         ImageHandler imgObj3 = imgObj1.createSameDimensions();
         ImageHandler imgObj4 = imgObj1.createSameDimensions();
+        ImageHandler imgObj5 = imgObj1.createSameDimensions();
+        ImageHandler imgObj6 = imgObj1.createSameDimensions();
+        
       
         if (pop.size() > 0) {
             for (Cell cell: pop) {
                 cell.nucleus.drawObject(imgObj1);
                 cell.nucleus.drawObject(imgObj2, 255);
                 
-                if (cell.cytoplasm != null) {
+                if (cell.THPositive) {
                     cell.cytoplasm.drawObject(imgObj3);
                     cell.cytoplasm.drawObject(imgObj4, 255);
-                } 
+                }
+                if (cell.NeuNPositive) {
+                    cell.cytoplasm.drawObject(imgObj5);
+                    cell.cytoplasm.drawObject(imgObj6, 255);
+                }
+                    
             }
         }
        
-        ImagePlus[] imgColors1 = {null, imgObj4.getImagePlus(), imgObj2.getImagePlus()};
+        ImagePlus[] imgColors1 = {imgObj6.getImagePlus(), imgObj4.getImagePlus(), imgObj2.getImagePlus()};
         ImagePlus imgObjects1 = new RGBStackMerge().mergeHyperstacks(imgColors1, false);
         imgObjects1.setCalibration(img.getCalibration());
         FileSaver ImgObjectsFile1 = new FileSaver(imgObjects1);
         ImgObjectsFile1.saveAsTiff(outDir + imgName + "_labels.tif"); 
         imgObj2.closeImagePlus();
         imgObj4.closeImagePlus();
+        imgObj6.closeImagePlus();
         flush_close(imgObjects1);
         
-        ImagePlus[] imgColors2 = {null, imgObj3.getImagePlus(), imgObj1.getImagePlus(), img};
+        ImagePlus[] imgColors2 = {imgObj5.getImagePlus(), imgObj3.getImagePlus(), imgObj1.getImagePlus(), img};
         ImagePlus imgObjects2 = new RGBStackMerge().mergeHyperstacks(imgColors2, false);
         imgObjects2.setCalibration(img.getCalibration());
         FileSaver ImgObjectsFile2 = new FileSaver(imgObjects2);
         ImgObjectsFile2.saveAsTiff(outDir + imgName + "_cells.tif"); 
         imgObj1.closeImagePlus();
         imgObj3.closeImagePlus();
+        imgObj5.closeImagePlus();
         flush_close(imgObjects2);
     }
     
