@@ -363,19 +363,22 @@ public class Tools {
     /*
      * Determine if cells are NeuN-positives
      */
-    public int NeuNPositivity(ArrayList<Cell> cells, Objects3DIntPopulation thPop) {
+    public int NeuNPositivity(ArrayList<Cell> cells, Objects3DIntPopulation pop, String type) {
         Objects3DIntPopulation cellsPop = new Objects3DIntPopulation();
         for(Cell cell: cells) 
             cellsPop.addObject(cell.cell);
         
         int nbNeuNCells = 0;
-        if (cellsPop.getNbObjects() > 0 && thPop.getNbObjects() > 0) {
-            MeasurePopulationColocalisation coloc = new MeasurePopulationColocalisation(cellsPop, thPop);
+        if (cellsPop.getNbObjects() > 0 && pop.getNbObjects() > 0) {
+            MeasurePopulationColocalisation coloc = new MeasurePopulationColocalisation(cellsPop, pop);
             for (Cell cell: cells) {
-                for (Object3DInt th: thPop.getObjects3DInt()) {
-                    double colocVal = coloc.getValueObjectsPair(cell.cell, th);
-                    if (colocVal > 0.25*th.size()) {
-                        cell.NeuNPositive = true;
+                for (Object3DInt obj: pop.getObjects3DInt()) {
+                    double colocVal = coloc.getValueObjectsPair(cell.cell, obj);
+                    if (colocVal > 0.25*obj.size()) {
+                        if (type.equals("th"))
+                            cell.NeuNPositive = true;
+                        else
+                            cell.THPositive = true;
                         nbNeuNCells++;
                         break;
                     }

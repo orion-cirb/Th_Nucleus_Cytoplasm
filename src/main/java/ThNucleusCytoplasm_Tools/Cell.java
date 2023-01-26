@@ -14,6 +14,7 @@ public class Cell {
     public Object3DInt nucleus;
     public Object3DInt cytoplasm;
     public boolean NeuNPositive;
+    public boolean THPositive;
     public HashMap<String, Double> parameters;
     
     public Cell(Object3DInt cell, Object3DInt nucleus, Object3DInt cytoplasm) {
@@ -21,6 +22,7 @@ public class Cell {
         this.nucleus = nucleus;
         this.cytoplasm = cytoplasm;
         this.NeuNPositive = false;
+        this.THPositive = false;
         this.parameters = new HashMap<>();
     }
     
