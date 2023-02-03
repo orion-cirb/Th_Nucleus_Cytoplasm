@@ -23,7 +23,7 @@
 * Detect Th cells with Cellpose
 * Detect NeuN cells with Cellpose
 * Colocalize nuclei with Th and NeuN cells and tag each nucleus as being NeuN+/NeuN- and Th+/Th-
-* Measure ORF1p intensity of nuclei, cytoplasms and cells
+* Measure intensity of nuclei, cytoplasms and cells in ORF1p channel
 
 ### Dependencies
 
