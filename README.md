@@ -2,7 +2,7 @@
 
 * **Developed for:** Olivia
 * **Team:** Prochiantz
-* **Date:** Janvier 2023
+* **Date:** February 2023
 * **Software:** Fiji
 
 
@@ -22,11 +22,8 @@
 * Detect DAPI nuclei with Cellpose
 * Detect Th cells with Cellpose
 * Detect NeuN cells with Cellpose
-* Keep Th cells colocalizing with a nucleus only
-* Mark Th cells with NeuN cells and tag them as NeuN+ or NeuN-
-* Measure ORF1p intensity in the nucleus and the cytoplasm of each Th cell
-* Measure ORF1p intensity in Th-negative nuclei
-
+* Colocalize nuclei with Th and NeuN cells and tag each nucleus as being NeuN+/NeuN- and Th+/Th-
+* Measure ORF1p intensity of nuclei, cytoplasms and cells
 
 ### Dependencies
 
@@ -35,4 +32,4 @@
 
 ### Version history
 
-Version 1 released on January 24, 2023.
+Version 2 released on February 3, 2023.
