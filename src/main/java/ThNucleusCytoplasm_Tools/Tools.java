@@ -26,7 +26,6 @@ import mcib3d.geom2.Object3DInt;
 import mcib3d.geom2.Object3DComputation;
 import mcib3d.geom2.Objects3DIntPopulation;
 import mcib3d.geom2.Objects3DIntPopulationComputation;
-import mcib3d.geom2.measurements.MeasureIntensity;
 import mcib3d.geom2.measurementsPopulation.MeasurePopulationColocalisation;
 import mcib3d.image3d.ImageHandler;
 import org.apache.commons.lang.BooleanUtils;
@@ -38,14 +37,13 @@ import org.apache.commons.lang.BooleanUtils;
  */
 public class Tools {
 
-    public boolean canceled = false;
     private final ImageIcon icon = new ImageIcon(this.getClass().getResource("/Orion_icon.png"));
     
     public ArrayList<String> channelsName = new ArrayList<String>(Arrays.asList("DAPI", "TH", "ORF1p", "NeuN"));;
     public Calibration cal;
     public double pixelVol;
     
-    public String cellposeEnvDir;
+    public String cellposeEnvDir = IJ.isWindows()? System.getProperty("user.home")+File.separator+"miniconda3"+File.separator+"envs"+File.separator+"CellPose" : "/opt/miniconda3/envs/cellpose";
     public String cellposeNucleusModel = "cyto";
     public int cellposeNucleusDiam = 80;
     public double minNucleusVol = 50;
@@ -241,11 +239,7 @@ public class Tools {
         }
         
         gd.addMessage("CellPose", Font.getFont("Monospace"), Color.blue);
-        String tempEnv = "/opt/miniconda3/envs/cellpose";
-        if (IJ.isWindows()) {
-            tempEnv = System.getProperty("user.home")+File.separator+"miniconda3"+File.separator+"envs"+File.separator+"CellPose";
-        }
-        gd.addDirectoryField​("Env directory", tempEnv);
+        gd.addDirectoryField​("Env directory", cellposeEnvDir);
         
         gd.addMessage("Nuclei detection", Font.getFont("Monospace"), Color.blue);
         gd.addNumericField("Min volume (µm3): ", minNucleusVol);
@@ -260,9 +254,6 @@ public class Tools {
         gd.addNumericField("Pixel depth: ", cal.pixelDepth);
         gd.showDialog();
 
-        if (gd.wasCanceled())
-            canceled = true;
-
         ArrayList<String> channelsOrdered = new ArrayList<String>();
         for (int n = 0; n < channels.size(); n++) 
             channelsOrdered.add(gd.getNextChoice());
@@ -276,6 +267,9 @@ public class Tools {
         cal.pixelDepth = gd.getNextNumber();
         pixelVol = cal.pixelWidth * cal.pixelHeight * cal.pixelDepth;
         
+        if (gd.wasCanceled())
+            channelsOrdered = null;
+                
         return(channelsOrdered);
     }
      
@@ -300,23 +294,21 @@ public class Tools {
        imgOut.setCalibration(cal);
        
        // Get cells as a population of objects
-       ImageHandler imgH = ImageHandler.wrap(imgOut);
-       Objects3DIntPopulation pop = new Objects3DIntPopulation(imgH);
+       Objects3DIntPopulation pop = new Objects3DIntPopulation(ImageHandler.wrap(imgOut));
        int nbCellsBeforeFiltering = pop.getNbObjects();
-       System.out.println(nbCellsBeforeFiltering + " CellPose detections");
+       System.out.println(nbCellsBeforeFiltering + " Cellpose detections");
        
        // Filter cells by size
        if (zFilter) {
            pop = zFilterPop(pop);
            System.out.println(pop.getNbObjects() + " detections remaining after z-filtering (" + (nbCellsBeforeFiltering-pop.getNbObjects()) + " filtered out)");
        }
-       Objects3DIntPopulationComputation popComputation = new Objects3DIntPopulationComputation​(pop);
-       Objects3DIntPopulation popFilter = popComputation.getFilterSize​(volMin/pixelVol, volMax/pixelVol);
-       popFilter.resetLabels();
+       Objects3DIntPopulation popFilter = new Objects3DIntPopulationComputation​(pop).getFilterSize​(volMin/pixelVol, volMax/pixelVol); 
        System.out.println(popFilter.getNbObjects() + " detections remaining after size filtering (" + (pop.getNbObjects()-popFilter.getNbObjects()) + " filtered out)");
+       popFilter.resetLabels();
        
+       flush_close(imgResized);
        flush_close(imgOut);
-       imgH.closeImagePlus();
        return(popFilter);
    } 
    
@@ -382,14 +374,15 @@ public class Tools {
     public void resetLabels(ArrayList<Cell> cellPop) {
         float label = 1;
         for (Cell cell: cellPop) {
+            cell.nucleus.setLabel(label);
             if (cell.cell != null) 
                 cell.cell.setLabel(label);
-            cell.nucleus.setLabel(label);
             if (cell.cytoplasm != null)
                 cell.cytoplasm.setLabel(label);
             label++;
         }
     }
+    
     
     /*
      * Set volume and intensity parameters of all cells in population
@@ -401,6 +394,8 @@ public class Tools {
             cell.fillIntensities(imh);
         }
     }
+    
+    
     /**
      * 
      */
@@ -427,7 +422,6 @@ public class Tools {
         ImageHandler imgObj5 = imgObj1.createSameDimensions();
         ImageHandler imgObj6 = imgObj1.createSameDimensions();
         
-      
         if (pop.size() > 0) {
             for (Cell cell: pop) {
                 cell.nucleus.drawObject(imgObj1);
@@ -447,7 +441,7 @@ public class Tools {
        
         ImagePlus[] imgColors1 = {imgObj6.getImagePlus(), imgObj4.getImagePlus(), imgObj2.getImagePlus()};
         ImagePlus imgObjects1 = new RGBStackMerge().mergeHyperstacks(imgColors1, false);
-        imgObjects1.setCalibration(img.getCalibration());
+        imgObjects1.setCalibration(cal);
         FileSaver ImgObjectsFile1 = new FileSaver(imgObjects1);
         ImgObjectsFile1.saveAsTiff(outDir + imgName + "_labels.tif"); 
         imgObj2.closeImagePlus();
@@ -457,7 +451,7 @@ public class Tools {
         
         ImagePlus[] imgColors2 = {imgObj5.getImagePlus(), imgObj3.getImagePlus(), imgObj1.getImagePlus(), img};
         ImagePlus imgObjects2 = new RGBStackMerge().mergeHyperstacks(imgColors2, false);
-        imgObjects2.setCalibration(img.getCalibration());
+        imgObjects2.setCalibration(cal);
         FileSaver ImgObjectsFile2 = new FileSaver(imgObjects2);
         ImgObjectsFile2.saveAsTiff(outDir + imgName + "_cells.tif"); 
         imgObj1.closeImagePlus();

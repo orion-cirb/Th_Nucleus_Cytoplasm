@@ -30,14 +30,15 @@ import mcib3d.geom2.Objects3DIntPopulation;
 
 
 /*
- * Detect DAPI nuclei and NeuN cells
- * Distinguish NeuN cells between TH-positive and TH-negative cells
- * Find intensity of different nuclei and cytoplasms in ORF1p channel
+ * Detect DAPI nuclei, NeuN cells and Th cells
+ * Tag eauch nucleus as being NeuN+/NeuN- and Th+/Th-
+ * Find intensity of nuclei cytoplasms and cells in ORF1p channel
+ *
+ * @author ORION_CIRB
  */
 public class Th_Nucleus_Cytoplasm implements PlugIn {
     
     Tools tools = new Tools();
-    private boolean canceled = false;
     private String imageDir = "";
     public  String outDirResults = "";
     public String fileExt;
@@ -45,12 +46,7 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
     public BufferedWriter cellsResults;
     
     public void run(String arg) {
-        try {
-            if (canceled) {
-                IJ.showMessage("Plugin canceled");
-                return;
-            }
-            
+        try {            
             if (! tools.checkInstalledModules()) {
                 return;
             }      
@@ -82,7 +78,7 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
             cellsResults = new BufferedWriter(fwCells);
             cellsResults.write(header);
             cellsResults.flush();
-            header = "Image name\tVolume (µm3)\tNb cells\tNb TH+/NeuN+ cells\tNb TH+/NeuN- cells\tNb TH-/NeuN+ cells\tNb TH-/NeuN- cells\n";
+            header = "Image name\tImage volume (µm3)\tNb cells\tNb TH+/NeuN+ cells\tNb TH+/NeuN- cells\tNb TH-/NeuN+ cells\tNb TH-/NeuN- cells\n";
             FileWriter fwGlobal = new FileWriter(outDirResults + "globalResults.xls", false);
             globalResults = new BufferedWriter(fwGlobal);
             globalResults.write(header);
@@ -104,8 +100,8 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
             
             // Channels dialog
             ArrayList<String> channelsOrdered = tools.dialog(channels);
-            if (channelsOrdered == null || tools.canceled) {
-                IJ.showMessage("Plugin cancelled");
+            if (channelsOrdered == null) {
+                IJ.showMessage("Plugin canceled");
                 return;
             }
             
@@ -131,7 +127,6 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
                 Objects3DIntPopulation dapiPop = tools.cellposeDetection(imgDAPI, tools.cellposeNucleusModel, tools.cellposeNucleusDiam, 0.5, true, tools.minNucleusVol, tools.maxNucleusVol);
                 System.out.println(dapiPop.getNbObjects() + " DAPI nuclei found");
                 
-                
                  // Open Th channel
                 tools.print("- Analyzing TH channel -");
                 System.setOut(new NullPrintStream());
@@ -146,13 +141,12 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
                 System.setOut(new NullPrintStream());
                 ImagePlus imgNeuN = BF.openImagePlus(options)[channels.indexOf(channelsOrdered.get(3))];
                 System.setOut(console);
-               
                 // Find NeuN cells
                 Objects3DIntPopulation neunPop = tools.cellposeDetection(imgNeuN, "cyto2", tools.cellposeCellDiam, 0.5, true, tools.minCellVol, tools.maxCellVol);
                 System.out.println(neunPop.getNbObjects() + " NeuN cells found");
                 
                 // Colocalization between DAPI nuclei and Th cells
-                tools.print("- Performing colocalization between DAPI nuclei and Th cells and NeuN cells -");
+                tools.print("- Performing colocalization between DAPI nuclei, TH cells and NeuN cells -");
                 ArrayList<Cell> colocPop = tools.colocalization(thPop, neunPop, dapiPop);
                
                 //  Open ORF1p channel

@@ -6,8 +6,7 @@ import mcib3d.geom2.Object3DInt;
 import mcib3d.geom2.measurements.MeasureIntensity;
 
 /**
- *
- * @author hm
+ * @author ORION_CIRB
  */
 public class Cell {
     public Object3DInt cell;
@@ -27,11 +26,11 @@ public class Cell {
     }
     
     public void fillVolumes(double pixelVol) {
+        parameters.put("nucleusVol", nucleus.size() * pixelVol);
         if (cell != null)
             parameters.put("cellVol", cell.size() * pixelVol);
         else
             parameters.put("cellVol", Double.NaN);
-        parameters.put("nucleusVol", nucleus.size() * pixelVol);
         if (cytoplasm != null)
             parameters.put("cytoplasmVol", cytoplasm.size() * pixelVol);
         else
@@ -39,11 +38,11 @@ public class Cell {
     }
     
     public void fillIntensities(ImageHandler imh) {
+        parameters.put("nucleusInt", new MeasureIntensity(nucleus, imh).getValueMeasurement(MeasureIntensity.INTENSITY_AVG));
         if (cell != null)
             parameters.put("cellInt", new MeasureIntensity(cell, imh).getValueMeasurement(MeasureIntensity.INTENSITY_AVG));
         else
             parameters.put("cellInt", Double.NaN);
-        parameters.put("nucleusInt", new MeasureIntensity(nucleus, imh).getValueMeasurement(MeasureIntensity.INTENSITY_AVG));
         if (cytoplasm != null)
             parameters.put("cytoplasmInt", new MeasureIntensity(cytoplasm, imh).getValueMeasurement(MeasureIntensity.INTENSITY_AVG));
         else
