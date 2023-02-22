@@ -32,4 +32,4 @@
 
 ### Version history
 
-Version 2 released on February 3, 2023.
+Version 2 released on February 22, 2023.
