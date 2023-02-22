@@ -31,8 +31,8 @@ import mcib3d.geom2.Objects3DIntPopulation;
 
 /*
  * Detect DAPI nuclei, NeuN cells and Th cells
- * Tag eauch nucleus as being NeuN+/NeuN- and Th+/Th-
- * Find intensity of nuclei cytoplasms and cells in ORF1p channel
+ * Tag each nucleus as being NeuN+/NeuN- and Th+/Th-
+ * Find intensity of nuclei, cytoplasms and cells in ORF1p channel
  *
  * @author ORION_CIRB
  */
@@ -124,7 +124,7 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
                 ImagePlus imgDAPI = BF.openImagePlus(options)[channels.indexOf(channelsOrdered.get(0))];
                 System.setOut(console);
                 // Find DAPI nuclei
-                Objects3DIntPopulation dapiPop = tools.cellposeDetection(imgDAPI, tools.cellposeNucleusModel, tools.cellposeNucleusDiam, 0.5, true, tools.minNucleusVol, tools.maxNucleusVol);
+                Objects3DIntPopulation dapiPop = tools.cellposeDetection(imgDAPI, tools.cellposeNucleusModel, tools.cellposeNucleusDiam, 0.5, tools.minNucleusVol, tools.maxNucleusVol);
                 System.out.println(dapiPop.getNbObjects() + " DAPI nuclei found");
                 
                  // Open Th channel
@@ -133,7 +133,7 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
                 ImagePlus imgTh = BF.openImagePlus(options)[channels.indexOf(channelsOrdered.get(1))];
                 System.setOut(console);
                 // Find Th cells
-                Objects3DIntPopulation thPop = tools.cellposeDetection(imgTh, "cyto2", tools.cellposeCellDiam, 0.5, false, tools.minCellVol, tools.maxCellVol);
+                Objects3DIntPopulation thPop = tools.cellposeDetection(imgTh, "cyto2", tools.cellposeCellDiam, 0.5, tools.minCellVol, tools.maxCellVol);
                 System.out.println(thPop.getNbObjects() + " TH cells found");
                 
                  // Open NeuN channel
@@ -142,7 +142,7 @@ public class Th_Nucleus_Cytoplasm implements PlugIn {
                 ImagePlus imgNeuN = BF.openImagePlus(options)[channels.indexOf(channelsOrdered.get(3))];
                 System.setOut(console);
                 // Find NeuN cells
-                Objects3DIntPopulation neunPop = tools.cellposeDetection(imgNeuN, "cyto2", tools.cellposeCellDiam, 0.5, true, tools.minCellVol, tools.maxCellVol);
+                Objects3DIntPopulation neunPop = tools.cellposeDetection(imgNeuN, "cyto2", tools.cellposeCellDiam, 0.5, tools.minCellVol, tools.maxCellVol);
                 System.out.println(neunPop.getNbObjects() + " NeuN cells found");
                 
                 // Colocalization between DAPI nuclei and Th cells

@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Arrays;
+import java.util.List;
 import javax.swing.ImageIcon;
 import loci.common.services.ServiceException;
 import loci.common.services.DependencyException;
@@ -26,7 +27,9 @@ import mcib3d.geom2.Object3DInt;
 import mcib3d.geom2.Object3DComputation;
 import mcib3d.geom2.Objects3DIntPopulation;
 import mcib3d.geom2.Objects3DIntPopulationComputation;
+import mcib3d.geom2.measurements.MeasureIntensity;
 import mcib3d.geom2.measurementsPopulation.MeasurePopulationColocalisation;
+import mcib3d.geom2.measurementsPopulation.PairObjects3DInt;
 import mcib3d.image3d.ImageHandler;
 import org.apache.commons.lang.BooleanUtils;
 
@@ -49,10 +52,9 @@ public class Tools {
     public double minNucleusVol = 50;
     public double maxNucleusVol = 2000;
     public String cellposeCellModel = "cyto2";
-    public int cellposeCellDiam = 100;
+    public int cellposeCellDiam = 110;
     public double minCellVol = 200;
     public double maxCellVol = 6000;
-    
     
     
     /*
@@ -279,7 +281,7 @@ public class Tools {
      * - apply CellPose in 2D slice by slice 
      * - let CellPose reconstruct cells in 3D using the stitch threshold parameters
      */
-   public Objects3DIntPopulation cellposeDetection(ImagePlus img, String cellposeModel, int diameter, double stitchThreshold, boolean zFilter, double volMin, double volMax) throws IOException{
+   public Objects3DIntPopulation cellposeDetection(ImagePlus img, String cellposeModel, int diameter, double stitchThreshold, double volMin, double volMax) throws IOException{
        // Define CellPose settings
        double resizeFactor = 0.5;
        CellposeTaskSettings settings = new CellposeTaskSettings(cellposeModel, 1, (int)(diameter*resizeFactor), cellposeEnvDir);
@@ -295,21 +297,18 @@ public class Tools {
        
        // Get cells as a population of objects
        Objects3DIntPopulation pop = new Objects3DIntPopulation(ImageHandler.wrap(imgOut));
-       int nbCellsBeforeFiltering = pop.getNbObjects();
-       System.out.println(nbCellsBeforeFiltering + " Cellpose detections");
+       System.out.println(pop.getNbObjects() + " Cellpose detections");
        
        // Filter cells by size
-       if (zFilter) {
-           pop = zFilterPop(pop);
-           System.out.println(pop.getNbObjects() + " detections remaining after z-filtering (" + (nbCellsBeforeFiltering-pop.getNbObjects()) + " filtered out)");
-       }
-       Objects3DIntPopulation popFilter = new Objects3DIntPopulationComputation​(pop).getFilterSize​(volMin/pixelVol, volMax/pixelVol); 
-       System.out.println(popFilter.getNbObjects() + " detections remaining after size filtering (" + (pop.getNbObjects()-popFilter.getNbObjects()) + " filtered out)");
-       popFilter.resetLabels();
+       pop = zFilterPop(pop);
+       System.out.println(pop.getNbObjects() + " detections remaining after z-filtering");
+       pop = new Objects3DIntPopulationComputation​(pop).getFilterSize​(volMin/pixelVol, volMax/pixelVol); 
+       System.out.println(pop.getNbObjects() + " detections remaining after size filtering");
+       pop.resetLabels();
        
        flush_close(imgResized);
        flush_close(imgOut);
-       return(popFilter);
+       return(pop);
    } 
    
    
@@ -333,29 +332,95 @@ public class Tools {
      */
     public ArrayList<Cell> colocalization(Objects3DIntPopulation thPop, Objects3DIntPopulation neunPop, Objects3DIntPopulation nucleiPop) {
         ArrayList<Cell> colocPop = new ArrayList<Cell>();
-        if (nucleiPop.getNbObjects() > 0 ) {
-            MeasurePopulationColocalisation colocTh = new MeasurePopulationColocalisation(nucleiPop, thPop);
-            MeasurePopulationColocalisation colocNeuN = new MeasurePopulationColocalisation(nucleiPop, neunPop);
+        
+        if (nucleiPop.getNbObjects() > 0) {
+            if (neunPop.getNbObjects() > 0) {
+                MeasurePopulationColocalisation colocNeuN = new MeasurePopulationColocalisation(neunPop, nucleiPop);
+                for (Object3DInt neun: neunPop.getObjects3DInt()) {
+                    List<PairObjects3DInt> listNeuN = colocNeuN.getPairsObject1(neun.getLabel(), true);
+                    if (!listNeuN.isEmpty()) {
+                        PairObjects3DInt pairNeuN = listNeuN.get(listNeuN.size()-1);
+                        Object3DInt nucleus = pairNeuN.getObject3D2();
+                        double colocVol = pairNeuN.getPairValue();
+                        if (colocVol > 0.5*nucleus.size()) {
+                            nucleus.setIdObject(neun.getLabel());
+                        }
+                    }
+                }
+            }
+                
+            if (thPop.getNbObjects() > 0) {
+                MeasurePopulationColocalisation colocTh = new MeasurePopulationColocalisation(thPop, nucleiPop);
+                for (Object3DInt th: thPop.getObjects3DInt()) {
+                    List<PairObjects3DInt> listTh = colocTh.getPairsObject1(th.getLabel(), true);
+                    if (!listTh.isEmpty()) {
+                        PairObjects3DInt pairTh = listTh.get(listTh.size()-1);
+                        Object3DInt nucleus = pairTh.getObject3D2();
+                        double colocVol = pairTh.getPairValue();
+                        if (colocVol > 0.5*nucleus.size()) {
+                            nucleus.setCompareValue​(th.getLabel());
+                        }
+                    }
+                }
+            }    
+                  
             for (Object3DInt nucleus: nucleiPop.getObjects3DInt()) {
                 Object3DInt cell = null;
                 Object3DInt cyto = null;
-                boolean thPos = false, neunPos = false; 
+                boolean thPos = false, neunPos = false;
+                
+                float neunLabel = nucleus.getIdObject();
+                if(neunLabel != 0) {
+                    cell = neunPop.getObjectByLabel(neunLabel);
+                    neunPos = true;
+                }
+                
+                float thLabel = (float) nucleus.getCompareValue();
+                if(thLabel != 0) {
+                    cell = thPop.getObjectByLabel(thLabel);
+                    thPos = true;
+                }
+                
+                if (cell != null) {
+                    Object3DComputation objComputation = new Object3DComputation(cell);
+                    cyto = objComputation.getObjectSubtracted(nucleus);
+                }
+                colocPop.add(new Cell(cell, nucleus, cyto, thPos, neunPos));
+            }
+        }
+            
+        resetLabels(colocPop);
+        return(colocPop);
+        
+        /*ArrayList<Cell> colocPop = new ArrayList<Cell>();       
+        if (nucleiPop.getNbObjects() > 0) {
+            MeasurePopulationColocalisation colocTh = new MeasurePopulationColocalisation(nucleiPop, thPop);
+            MeasurePopulationColocalisation colocNeuN = new MeasurePopulationColocalisation(nucleiPop, neunPop);
+            
+            for (Object3DInt nucleus: nucleiPop.getObjects3DInt()) {
+                Object3DInt cell = null;
+                Object3DInt cyto = null;
+                boolean thPos = false, neunPos = false;
+                
                 for (Object3DInt neun: neunPop.getObjects3DInt()) {
                     double colocVal = colocNeuN.getValueObjectsPair(nucleus, neun);
-                    if (colocVal > 0.5*nucleus.size()) {
+                    if (colocVal > 0.6*nucleus.size()) {
                         cell = neun;
                         neunPos = true;
+                        neunPop.removeObject(neun);
                         break;
                     }
                 }
                 for (Object3DInt th: thPop.getObjects3DInt()) {
                     double colocVal = colocTh.getValueObjectsPair(nucleus, th);
-                    if (colocVal > 0.25*nucleus.size()) {
+                    if (colocVal > 0.6*nucleus.size()) {
                         cell = th;
                         thPos = true;
+                        thPop.removeObject(th);
                         break;
                     }
                 }
+                
                 if (cell != null) {
                     Object3DComputation objComputation = new Object3DComputation(cell);
                     cyto = objComputation.getObjectSubtracted(nucleus);
@@ -364,7 +429,7 @@ public class Tools {
             }
         }
         resetLabels(colocPop);
-        return(colocPop);
+        return(colocPop);*/
     }
     
     
@@ -439,21 +504,21 @@ public class Tools {
             }
         }
        
-        ImagePlus[] imgColors1 = {imgObj6.getImagePlus(), imgObj4.getImagePlus(), imgObj2.getImagePlus()};
+        ImagePlus[] imgColors1 = {imgObj6.getImagePlus(), imgObj4.getImagePlus(), imgObj2.getImagePlus(), img};
         ImagePlus imgObjects1 = new RGBStackMerge().mergeHyperstacks(imgColors1, false);
         imgObjects1.setCalibration(cal);
         FileSaver ImgObjectsFile1 = new FileSaver(imgObjects1);
-        ImgObjectsFile1.saveAsTiff(outDir + imgName + "_labels.tif"); 
+        ImgObjectsFile1.saveAsTiff(outDir + imgName + "_cells.tif"); 
         imgObj2.closeImagePlus();
         imgObj4.closeImagePlus();
         imgObj6.closeImagePlus();
         flush_close(imgObjects1);
         
-        ImagePlus[] imgColors2 = {imgObj5.getImagePlus(), imgObj3.getImagePlus(), imgObj1.getImagePlus(), img};
+        ImagePlus[] imgColors2 = {imgObj5.getImagePlus(), imgObj3.getImagePlus(), imgObj1.getImagePlus()};
         ImagePlus imgObjects2 = new RGBStackMerge().mergeHyperstacks(imgColors2, false);
         imgObjects2.setCalibration(cal);
         FileSaver ImgObjectsFile2 = new FileSaver(imgObjects2);
-        ImgObjectsFile2.saveAsTiff(outDir + imgName + "_cells.tif"); 
+        ImgObjectsFile2.saveAsTiff(outDir + imgName + "_labels.tif"); 
         imgObj1.closeImagePlus();
         imgObj3.closeImagePlus();
         imgObj5.closeImagePlus();
