@@ -391,45 +391,6 @@ public class Tools {
             
         resetLabels(colocPop);
         return(colocPop);
-        
-        /*ArrayList<Cell> colocPop = new ArrayList<Cell>();       
-        if (nucleiPop.getNbObjects() > 0) {
-            MeasurePopulationColocalisation colocTh = new MeasurePopulationColocalisation(nucleiPop, thPop);
-            MeasurePopulationColocalisation colocNeuN = new MeasurePopulationColocalisation(nucleiPop, neunPop);
-            
-            for (Object3DInt nucleus: nucleiPop.getObjects3DInt()) {
-                Object3DInt cell = null;
-                Object3DInt cyto = null;
-                boolean thPos = false, neunPos = false;
-                
-                for (Object3DInt neun: neunPop.getObjects3DInt()) {
-                    double colocVal = colocNeuN.getValueObjectsPair(nucleus, neun);
-                    if (colocVal > 0.6*nucleus.size()) {
-                        cell = neun;
-                        neunPos = true;
-                        neunPop.removeObject(neun);
-                        break;
-                    }
-                }
-                for (Object3DInt th: thPop.getObjects3DInt()) {
-                    double colocVal = colocTh.getValueObjectsPair(nucleus, th);
-                    if (colocVal > 0.6*nucleus.size()) {
-                        cell = th;
-                        thPos = true;
-                        thPop.removeObject(th);
-                        break;
-                    }
-                }
-                
-                if (cell != null) {
-                    Object3DComputation objComputation = new Object3DComputation(cell);
-                    cyto = objComputation.getObjectSubtracted(nucleus);
-                }
-                colocPop.add(new Cell(cell, nucleus, cyto, thPos, neunPos));
-            }
-        }
-        resetLabels(colocPop);
-        return(colocPop);*/
     }
     
     
