@@ -1,7 +1,7 @@
 # Th_Nucleus_Cytoplasm
 
 * **Developed for:** Olivia
-* **Team:** Proschiantz
+* **Team:** Prochiantz
 * **Date:** September 2022
 * **Software:** Fiji
 
